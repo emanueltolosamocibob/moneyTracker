@@ -124,11 +124,53 @@ body {
   border-right: 1px solid rgba(255, 255, 255, 0.14);
   background: rgba(10, 8, 40, 0.28);
   backdrop-filter: blur(14px);
+  transition: width 0.2s ease, padding 0.2s ease;
+}
+
+.sidebar.collapsed {
+  width: 68px;
+  padding-left: 0.6rem;
+  padding-right: 0.6rem;
+}
+
+.sidebar-toggle {
+  position: absolute;
+  top: 1.4rem;
+  right: -12px;
+  z-index: 2;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  background: #2a2170;
+  color: white;
+  cursor: pointer;
+  padding: 0;
+}
+
+.sidebar-toggle svg {
+  transform: rotate(90deg);
+  transition: transform 0.2s ease;
+}
+
+.sidebar.collapsed .sidebar-toggle svg {
+  transform: rotate(-90deg);
 }
 
 .sidebar-brand {
   display: flex;
   align-items: center;
+  gap: 0.6rem;
+}
+
+.brand-mark {
+  width: 22px;
+  height: 22px;
+  border-radius: 5px;
+  flex-shrink: 0;
 }
 
 .brand {
@@ -202,6 +244,40 @@ body {
 
 .sidebar-user button:hover {
   background: rgba(255, 255, 255, 0.14);
+}
+
+/* Colapsado: se esconden las etiquetas de texto (con transición) y todo
+   queda centrado mostrando solo íconos + el logo. */
+.nav-label {
+  display: inline-block;
+  max-width: 200px;
+  overflow: hidden;
+  white-space: nowrap;
+  opacity: 1;
+  transition: max-width 0.2s ease, opacity 0.15s ease;
+}
+
+.sidebar.collapsed .nav-label {
+  max-width: 0;
+  opacity: 0;
+}
+
+.sidebar.collapsed .nav-btn {
+  justify-content: center;
+  gap: 0;
+  padding: 0.6rem;
+}
+
+.sidebar.collapsed .sidebar-user button {
+  gap: 0;
+}
+
+.sidebar.collapsed .sidebar-user {
+  align-items: center;
+}
+
+.sidebar.collapsed .sidebar-user button {
+  align-self: center;
 }
 
 .app-content {
