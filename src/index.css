@@ -8,6 +8,7 @@
   --text: #e8eaed;
   --danger: #ff6b6b;
   --income: #4ade80;
+  --warning: #f5a623;
 }
 
 * {
@@ -297,6 +298,38 @@ body {
   color: white;
 }
 
+.tx-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.gmail-scan-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.9rem;
+  border-radius: var(--radius);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.08);
+  color: white;
+  font-family: inherit;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.gmail-scan-btn:hover {
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.gmail-scan-btn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
 .tx-form {
   display: flex;
   gap: 0.5rem;
@@ -437,6 +470,74 @@ body {
   font-weight: 600;
 }
 
+.select-option-label {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.select-option-delete {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: none;
+  color: rgba(255, 255, 255, 0.45);
+  cursor: pointer;
+  padding: 2px;
+}
+
+.select-option-delete:hover {
+  color: var(--danger);
+}
+
+.select-create-trigger {
+  color: rgba(255, 255, 255, 0.7);
+  border-top: 1px solid rgba(255, 255, 255, 0.14);
+  margin-top: 2px;
+  padding-top: 0.6rem;
+}
+
+.select-create-row {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.4rem 0.6rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.14);
+  margin-top: 2px;
+  cursor: default;
+}
+
+.select-create-row input {
+  flex: 1;
+  min-width: 0;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: var(--radius);
+  color: white;
+  padding: 0.3rem 0.5rem;
+  font-family: inherit;
+  font-size: 0.9rem;
+}
+
+.select-create-row button {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: rgba(255, 255, 255, 0.15);
+  color: white;
+  border-radius: var(--radius);
+  padding: 0.35rem;
+  cursor: pointer;
+}
+
+.select-create-row button:hover {
+  background: rgba(255, 255, 255, 0.25);
+}
+
 /* Solo el botón "Agregar" (hijo directo del form) — un descendant selector
    acá también pegaría sobre el <button> del Select anidado adentro de
    .select, pisándole el estilo translúcido por tener más especificidad. */
@@ -497,6 +598,13 @@ body {
   vertical-align: middle;
 }
 
+.new-badge {
+  display: inline-block;
+  margin-right: 0.4rem;
+  color: var(--warning);
+  font-weight: 800;
+}
+
 .tx-amount,
 .tx-payment-method {
   font-family: var(--font-mono);
@@ -519,6 +627,46 @@ body {
 
 .tx-amount.negative {
   color: var(--danger);
+}
+
+.tx-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-top: 1rem;
+  font-size: 0.85rem;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.tx-pagination-size,
+.tx-pagination-nav {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.tx-pagination-size button,
+.tx-pagination-nav button {
+  padding: 0.3rem 0.6rem;
+  border-radius: var(--radius);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.06);
+  color: white;
+  font-family: inherit;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.tx-pagination-size button.active {
+  background: rgba(255, 255, 255, 0.18);
+  font-weight: 700;
+}
+
+.tx-pagination-nav button:disabled {
+  opacity: 0.4;
+  cursor: default;
 }
 
 .tx-summary {

@@ -18,10 +18,18 @@ export interface Category {
   created_at: string
 }
 
+export interface IncomeSource {
+  id: string
+  user_id: string
+  name: string
+  created_at: string
+}
+
 export interface Transaction {
   id: string
   user_id: string
   category_id: string | null
+  income_source_id: string | null
   amount: number
   currency: string
   merchant: string | null
@@ -34,6 +42,7 @@ export interface Transaction {
   card_last4: string | null
   category_confidence: number | null
   needs_review: boolean
+  seen: boolean
   created_at: string
 }
 

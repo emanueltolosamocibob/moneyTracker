@@ -2,18 +2,6 @@ import { generateObject, generateText, stepCountIs } from 'ai'
 import { openai } from '@ai-sdk/openai'
 import { z } from 'zod'
 
-const CATEGORIES = [
-  'Supermercado',
-  'Restaurantes',
-  'Transporte',
-  'Servicios',
-  'Salud',
-  'Entretenimiento',
-  'Compras',
-  'Alquiler',
-  'Otros',
-] as const
-
 const extractionSchema = z.object({
   is_payment_confirmation: z
     .boolean()
@@ -23,7 +11,10 @@ const extractionSchema = z.object({
   merchant: z.string().nullable().describe('Comercio o destinatario del pago'),
   occurred_at: z.string().nullable().describe('Fecha/hora ISO 8601 si figura en el mail'),
   type: z.enum(['expense', 'income']).nullable(),
-  category: z.enum(CATEGORIES),
+  category: z
+    .string()
+    .describe('Una de las categorías existentes del usuario, o un nombre nuevo corto si ninguna encaja'),
+  is_new_category: z.boolean().describe('true si "category" no es una de las existentes que se le pasaron'),
   confidence: z.number().min(0).max(1),
   payment_method: z
     .enum(['credit_card', 'debit_card', 'transfer', 'cash', 'other'])
@@ -41,7 +32,13 @@ export type ExtractedTransaction = z.infer<typeof extractionSchema>
 
 const LOW_CONFIDENCE_THRESHOLD = 0.6
 
-async function runExtraction(emailText: string, merchantResearch?: string) {
+// Umbral más exigente que el de revisión manual: crear una categoría nueva
+// es una acción "destructiva" en el sentido de que ensucia la lista del
+// usuario si el LLM se equivoca, así que pedimos bastante más confianza que
+// para simplemente asignar una ya existente.
+export const NEW_CATEGORY_CONFIDENCE_THRESHOLD = 0.85
+
+async function runExtraction(emailText: string, categoryNames: string[], merchantResearch?: string) {
   const { object } = await generateObject({
     // String plano: resuelto vía Vercel AI Gateway (no requiere SDK del
     // provider ni key propia en despliegues de Vercel).
@@ -49,7 +46,10 @@ async function runExtraction(emailText: string, merchantResearch?: string) {
     schema: extractionSchema,
     prompt: `Analizá este email de banco/billetera y extraé los datos del pago o transferencia.
 Si el mail no confirma un pago real (ej. es publicidad, resumen mensual, o aviso genérico), marcá is_payment_confirmation en false.
-Elegí la categoría que mejor describa el gasto según el comercio/destinatario.
+
+Las categorías que ya tiene este usuario son: ${categoryNames.join(', ')}.
+Elegí la que mejor describa el gasto. Si ninguna encaja razonablemente, proponé un nombre de categoría nuevo — corto, específico y reutilizable (ej. "Mascotas", "Educación"), nunca un cajón de sastre genérico — y marcá is_new_category en true. Usá "Otros" solo cuando de verdad no se pueda determinar el rubro.
+
 Identificá también el medio de pago (tarjeta de crédito, débito, transferencia o efectivo) y, si el mail menciona una tarjeta terminada en algún número, extraé esos 4 dígitos en card_last4.
 
 ---
@@ -85,8 +85,11 @@ async function researchMerchant(merchant: string): Promise<string | null> {
   }
 }
 
-export async function extractAndCategorize(emailText: string): Promise<ExtractedTransaction> {
-  const initial = await runExtraction(emailText)
+export async function extractAndCategorize(
+  emailText: string,
+  categoryNames: string[],
+): Promise<ExtractedTransaction> {
+  const initial = await runExtraction(emailText, categoryNames)
 
   const isAmbiguous = initial.category === 'Otros' || initial.confidence < LOW_CONFIDENCE_THRESHOLD
   if (!isAmbiguous || !initial.merchant) {
@@ -98,7 +101,7 @@ export async function extractAndCategorize(emailText: string): Promise<Extracted
     return initial
   }
 
-  const refined = await runExtraction(emailText, research)
+  const refined = await runExtraction(emailText, categoryNames, research)
   // Si la segunda pasada no mejoró nada, nos quedamos con la primera.
   return refined.confidence >= initial.confidence ? refined : initial
 }
