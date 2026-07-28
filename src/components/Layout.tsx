@@ -7,20 +7,27 @@ export default function Layout() {
 
   return (
     <div className="app-shell">
-      <header className="app-header">
-        <span className="brand">MoneyTracker</span>
-        <nav className="tabs">
+      <aside className="sidebar">
+        <div className="sidebar-brand">
+          <span className="hamburger" aria-hidden="true">
+            <span />
+            <span />
+            <span />
+          </span>
+          <span className="brand">MoneyTracker</span>
+        </div>
+        <nav className="sidebar-nav">
           <NavLink to="/" end>
             Transacciones
           </NavLink>
           <NavLink to="/budgets">Presupuestos</NavLink>
           <NavLink to="/investments">Inversiones</NavLink>
         </nav>
-        <div className="user-menu">
+        <div className="sidebar-user">
           <span>{user?.email}</span>
           <button onClick={() => supabase.auth.signOut()}>Salir</button>
         </div>
-      </header>
+      </aside>
       <main className="app-content">
         <Outlet />
       </main>
