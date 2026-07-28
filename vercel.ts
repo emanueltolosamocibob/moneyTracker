@@ -1,9 +1,13 @@
-import type { VercelConfig } from '@vercel/config/v1'
+import { routes, type VercelConfig } from '@vercel/config/v1'
 
 export const config: VercelConfig = {
   framework: 'vite',
   buildCommand: 'npm run build',
   outputDirectory: 'dist',
+  // SPA: cualquier ruta que no matchee un archivo estático o una función de
+  // /api (esas tienen prioridad y se resuelven antes que esto) cae en
+  // index.html, para que React Router la maneje del lado del cliente.
+  rewrites: [routes.rewrite('/(.*)', '/index.html')],
   crons: [
     // El plan Hobby de Vercel limita los cron jobs a 1 corrida por día.
     // Corre todos los días a las 09:00 UTC (06:00 ART). Si en algún momento
