@@ -353,8 +353,8 @@ body {
 }
 
 .type-toggle button.active.income {
-  background: var(--income);
-  color: #06281a;
+  background: rgba(74, 222, 128, 0.22);
+  color: var(--income);
 }
 
 /* --- Select custom (reemplaza al <select> nativo, ver Select.tsx) --- */
