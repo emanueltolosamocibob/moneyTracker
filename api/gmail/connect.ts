@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
-import { getUserIdFromRequest, supabaseAdmin } from '../_lib/supabaseAdmin'
+import { getUserIdFromRequest, supabaseAdmin } from '../_lib/supabaseAdmin.js'
 
 // Llamado desde AuthCallback justo después del OAuth de Google, con el
 // refresh_token de Gmail que Supabase capturó en la sesión inicial.

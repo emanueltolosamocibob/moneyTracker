@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
-import { getUserIdFromRequest, supabaseAdmin } from '../_lib/supabaseAdmin'
-import { scanGmailForUser } from '../_lib/scanGmailForUser'
+import { getUserIdFromRequest, supabaseAdmin } from '../_lib/supabaseAdmin.js'
+import { scanGmailForUser } from '../_lib/scanGmailForUser.js'
 
 // Botón "Traer de Gmail" en Transacciones: dispara el mismo escaneo
 // incremental que el cron (solo mails nuevos desde el último last_scanned_at),

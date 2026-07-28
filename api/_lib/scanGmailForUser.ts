@@ -1,7 +1,7 @@
-import { supabaseAdmin } from './supabaseAdmin'
-import { buildGmailQuery } from './bankSenders'
-import { refreshAccessToken, listMessageIds, getMessagePlainText } from './gmail'
-import { extractAndCategorize, NEW_CATEGORY_CONFIDENCE_THRESHOLD } from './categorize'
+import { supabaseAdmin } from './supabaseAdmin.js'
+import { buildGmailQuery } from './bankSenders.js'
+import { refreshAccessToken, listMessageIds, getMessagePlainText } from './gmail.js'
+import { extractAndCategorize, NEW_CATEGORY_CONFIDENCE_THRESHOLD } from './categorize.js'
 
 type Admin = ReturnType<typeof supabaseAdmin>
 type Connection = { user_id: string; refresh_token: string; last_scanned_at: string | null }
