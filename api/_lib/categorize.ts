@@ -10,6 +10,7 @@ const CATEGORIES = [
   'Salud',
   'Entretenimiento',
   'Compras',
+  'Alquiler',
   'Otros',
 ] as const
 
