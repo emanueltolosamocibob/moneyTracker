@@ -11,7 +11,18 @@ type Connection = { user_id: string; refresh_token: string; last_scanned_at: str
 // api/cron/scan-gmail.ts y api/gmail/scan.ts.
 export async function scanGmailForUser(admin: Admin, conn: Connection): Promise<string> {
   const accessToken = await refreshAccessToken(conn.refresh_token)
-  const query = buildGmailQuery(conn.last_scanned_at ?? undefined)
+
+  // Nunca busca más atrás que el 1° del mes actual (aunque last_scanned_at
+  // sea de un mes anterior, o sea la primera sincronización de la cuenta) —
+  // pero dentro del mes sigue siendo incremental para no reprocesar (y
+  // volver a gastar LLM en) los mismos mails en cada corrida.
+  const startOfMonth = new Date()
+  startOfMonth.setDate(1)
+  startOfMonth.setHours(0, 0, 0, 0)
+  const lastScanned = conn.last_scanned_at ? new Date(conn.last_scanned_at) : null
+  const since = lastScanned && lastScanned > startOfMonth ? lastScanned.toISOString() : startOfMonth.toISOString()
+
+  const query = buildGmailQuery(since)
   const messageIds = await listMessageIds(accessToken, query)
 
   const { data: existingCategories } = await admin
