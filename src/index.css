@@ -310,7 +310,10 @@ body {
   font-weight: 600;
 }
 
-.tx-form button {
+/* Solo el botón "Agregar" (hijo directo del form) — un descendant selector
+   acá también pegaría sobre el <button> del Select anidado adentro de
+   .select, pisándole el estilo translúcido por tener más especificidad. */
+.tx-form > button {
   display: inline-flex;
   align-items: center;
   gap: 0.4rem;
@@ -321,10 +324,11 @@ body {
   color: #1a1fb8;
   font-weight: 700;
   font-family: inherit;
+  font-size: 1rem;
   cursor: pointer;
 }
 
-.tx-form button:hover {
+.tx-form > button:hover {
   background: #f4f4ff;
 }
 
