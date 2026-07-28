@@ -5,8 +5,9 @@ export const config: VercelConfig = {
   buildCommand: 'npm run build',
   outputDirectory: 'dist',
   crons: [
-    // Cada 30 min. En el plan Hobby, Vercel puede forzar una frecuencia
-    // mínima menor (ej. 1/día) — ajustar si el deploy lo rechaza.
-    { path: '/api/cron/scan-gmail', schedule: '*/30 * * * *' },
+    // El plan Hobby de Vercel limita los cron jobs a 1 corrida por día.
+    // Corre todos los días a las 09:00 UTC (06:00 ART). Si en algún momento
+    // se pasa a Pro, se puede volver a algo más frecuente como '*/30 * * * *'.
+    { path: '/api/cron/scan-gmail', schedule: '0 9 * * *' },
   ],
 }
