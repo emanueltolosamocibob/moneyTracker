@@ -165,9 +165,9 @@ body {
 }
 
 .nav-btn.active {
-  color: #1a1fb8;
-  background: white;
-  border-color: white;
+  color: white;
+  background: rgba(255, 255, 255, 0.18);
+  border-color: rgba(255, 255, 255, 0.35);
 }
 
 .sidebar-user {
