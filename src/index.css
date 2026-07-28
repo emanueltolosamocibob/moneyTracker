@@ -241,6 +241,20 @@ body {
   color: rgba(255, 255, 255, 0.55);
 }
 
+.tx-form select {
+  /* La lista desplegada de un <select> la dibuja el SO/navegador, no el
+     `background` translúcido de arriba — sin esto queda texto claro sobre
+     fondo claro. color-scheme fuerza el popup nativo a su variante oscura;
+     el color sólido en <option> es el fallback para los navegadores que sí
+     permiten estilarlas (Chrome/Firefox/Edge). */
+  color-scheme: dark;
+}
+
+.tx-form select option {
+  background: #1a1330;
+  color: white;
+}
+
 .tx-form input[type='number'] {
   font-family: var(--font-mono);
 }
