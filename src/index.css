@@ -320,7 +320,7 @@ body {
   padding: 0.5rem 1rem;
   border-radius: var(--radius);
   border: none;
-  background: white;
+  background: rgba(255, 255, 255, 0.9);
   color: #1a1fb8;
   font-weight: 700;
   font-family: inherit;
