@@ -503,8 +503,22 @@ body {
   letter-spacing: 0.03em;
 }
 
+.tx-payment-method {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.tx-card-digits {
+  color: rgba(255, 255, 255, 0.6);
+}
+
 .tx-amount.income {
   color: var(--income);
+}
+
+.tx-amount.negative {
+  color: var(--danger);
 }
 
 .tx-summary {

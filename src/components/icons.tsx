@@ -8,6 +8,11 @@ const base = {
   strokeWidth: 1.8,
   strokeLinecap: 'round' as const,
   strokeLinejoin: 'round' as const,
+  // Un <svg> inline por defecto es display:inline, que le deja unos px de
+  // hueco "fantasma" abajo (espacio para descendentes de texto). Con eso
+  // mezclado en una tabla, las filas con ícono terminan un pelo más altas
+  // que las que muestran "—", y la tabla se ve descolocada entre filas.
+  display: 'block' as const,
 }
 
 export function IconReceipt({ size = 18 }: IconProps) {
