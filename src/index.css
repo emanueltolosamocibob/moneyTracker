@@ -596,6 +596,32 @@ body {
   font-weight: 600;
 }
 
+.tx-merchant {
+  font-weight: 400;
+}
+
+.tx-actions {
+  width: 1%;
+  text-align: right;
+}
+
+.tx-delete-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.55);
+  border-radius: var(--radius);
+  padding: 0.3rem;
+  cursor: pointer;
+}
+
+.tx-delete-btn:hover {
+  background: rgba(255, 255, 255, 0.18);
+  color: white;
+}
+
 /* Importante: el flex va en un <span> adentro de la celda, nunca en el
    <td> directamente — un <td> con display:flex deja de comportarse como
    celda de tabla y descoloca toda la fila. */
@@ -657,7 +683,7 @@ body {
   justify-content: space-between;
   flex-wrap: wrap;
   gap: 0.75rem;
-  margin-top: 1rem;
+  margin-top: 1.5rem;
   font-size: 0.85rem;
   color: rgba(255, 255, 255, 0.7);
 }
