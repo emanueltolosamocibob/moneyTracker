@@ -6,7 +6,7 @@ export const BANK_SENDER_DOMAINS = [
   'notificaciones@mercadopago.com.ar',
   'no-responder@ualá.com.ar',
   'notificaciones@bancogalicia.com.ar',
-  'notificaciones@santanderrio.com.ar',
+  'mensajesyavisos@mails.santander.com.ar',
   'notificaciones@bbva.com.ar',
   'alertas@bancociudad.com.ar',
   'notificaciones@brubank.com',

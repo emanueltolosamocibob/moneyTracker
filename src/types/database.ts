@@ -1,5 +1,6 @@
 export type TransactionSource = 'gmail' | 'manual'
 export type TransactionType = 'expense' | 'income'
+export type PaymentMethod = 'credit_card' | 'debit_card' | 'transfer' | 'cash' | 'other'
 
 export interface Profile {
   id: string
@@ -29,6 +30,8 @@ export interface Transaction {
   type: TransactionType
   source: TransactionSource
   source_email_id: string | null
+  payment_method: PaymentMethod | null
+  card_last4: string | null
   category_confidence: number | null
   needs_review: boolean
   created_at: string

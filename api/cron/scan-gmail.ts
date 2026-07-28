@@ -68,6 +68,8 @@ async function scanConnection(
       source_email_id: messageId,
       category_confidence: extracted.confidence,
       needs_review: extracted.confidence < 0.6,
+      payment_method: extracted.payment_method,
+      card_last4: extracted.card_last4,
     })
 
     // Ignoramos conflictos de unique(user_id, source_email_id): significa
