@@ -161,9 +161,9 @@ export default function Transactions() {
                   <td>{new Date(t.occurred_at).toLocaleDateString('es-AR')}</td>
                   <td>{t.merchant ?? '—'}</td>
                   <td>{cat?.name ?? (t.needs_review ? 'Sin revisar' : '—')}</td>
-                  <td>{formatPaymentMethod(t)}</td>
+                  <td className="tx-payment-method">{formatPaymentMethod(t)}</td>
                   <td>{t.source === 'gmail' ? 'Gmail' : 'Manual'}</td>
-                  <td>
+                  <td className="tx-amount">
                     {t.type === 'expense' ? '-' : '+'}
                     {t.amount.toLocaleString('es-AR', { style: 'currency', currency: t.currency })}
                   </td>

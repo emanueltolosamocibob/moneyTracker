@@ -11,8 +11,14 @@ export default function Login() {
   return (
     <div className="auth-screen">
       <div className="auth-card">
-        <h1>MoneyTracker</h1>
-        <p>Seguimiento de gastos personales, automático a partir de tu Gmail.</p>
+        <h1>
+          Tus gastos,
+          <br />
+          en piloto
+          <br />
+          automático.
+        </h1>
+        <p>Seguimiento de gastos personales, detectados solos a partir de tu Gmail.</p>
         <button className="google-btn" onClick={() => signInWithGoogle()}>
           Continuar con Google
         </button>
