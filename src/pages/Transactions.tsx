@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { supabase } from '../lib/supabaseClient'
 import { useAuth } from '../lib/AuthContext'
 import type { Category, IncomeSource, PaymentMethod, Transaction, TransactionType } from '../types/database'
-import { IconPlus, IconRefresh } from '../components/icons'
+import { IconPlus, IconRefresh, IconX } from '../components/icons'
 import Select from '../components/Select'
 import { getCategoryIcon } from '../lib/categoryIcons'
 
@@ -178,14 +178,13 @@ export default function Transactions() {
     setIncomeSourceId(data.id)
   }
 
-  async function handleDeleteIncomeSource(id: string) {
-    const { error: deleteError } = await supabase.from('income_sources').delete().eq('id', id)
+  async function handleDeleteTransaction(id: string) {
+    const { error: deleteError } = await supabase.from('transactions').delete().eq('id', id)
     if (deleteError) {
       setError(deleteError.message)
       return
     }
-    setIncomeSources((prev) => prev.filter((s) => s.id !== id))
-    if (incomeSourceId === id) setIncomeSourceId('')
+    setTransactions((prev) => prev.filter((t) => t.id !== id))
   }
 
   async function handleScanGmail() {
@@ -250,7 +249,6 @@ export default function Transactions() {
             placeholder="Fuente de ingreso"
             options={incomeSources.map((s) => ({ value: s.id, label: s.name }))}
             onCreate={handleCreateIncomeSource}
-            onDelete={handleDeleteIncomeSource}
             createLabel="Agregar fuente"
           />
         ) : (
@@ -319,6 +317,7 @@ export default function Transactions() {
                 <th>Categoría</th>
                 <th>Medio de pago</th>
                 <th>Monto</th>
+                <th></th>
               </tr>
             </thead>
             <tbody>
@@ -335,7 +334,7 @@ export default function Transactions() {
                       )}
                       {new Date(t.occurred_at).toLocaleDateString('es-AR')}
                     </td>
-                    <td>
+                    <td className="tx-merchant">
                       {t.needs_review && <span className="review-dot" title="Necesita revisión" />}
                       {t.merchant ?? source?.name ?? '—'}
                     </td>
@@ -355,11 +354,38 @@ export default function Transactions() {
                       {t.type === 'expense' ? '-' : '+'}
                       {formatCurrency(t.amount, t.currency)}
                     </td>
+                    <td className="tx-actions">
+                      <button
+                        type="button"
+                        className="tx-delete-btn"
+                        aria-label="Eliminar transacción"
+                        onClick={() => handleDeleteTransaction(t.id)}
+                      >
+                        <IconX size={14} />
+                      </button>
+                    </td>
                   </tr>
                 )
               })}
             </tbody>
           </table>
+
+          <div className="tx-summary">
+            <div>
+              <span>Ingresos</span>
+              <strong className="tx-amount income">{formatCurrency(totals.income, 'ARS')}</strong>
+            </div>
+            <div>
+              <span>Egresos</span>
+              <strong className="tx-amount">{formatCurrency(totals.expense, 'ARS')}</strong>
+            </div>
+            <div>
+              <span>Neto</span>
+              <strong className={`tx-amount ${totals.net < 0 ? 'negative' : ''}`}>
+                {formatCurrency(totals.net, 'ARS')}
+              </strong>
+            </div>
+          </div>
 
           <div className="tx-pagination">
             <div className="tx-pagination-size">
@@ -396,23 +422,6 @@ export default function Transactions() {
                 </button>
               </div>
             )}
-          </div>
-
-          <div className="tx-summary">
-            <div>
-              <span>Ingresos</span>
-              <strong className="tx-amount income">{formatCurrency(totals.income, 'ARS')}</strong>
-            </div>
-            <div>
-              <span>Egresos</span>
-              <strong className="tx-amount">{formatCurrency(totals.expense, 'ARS')}</strong>
-            </div>
-            <div>
-              <span>Neto</span>
-              <strong className={`tx-amount ${totals.net >= 0 ? 'income' : 'negative'}`}>
-                {formatCurrency(totals.net, 'ARS')}
-              </strong>
-            </div>
           </div>
         </>
       )}
