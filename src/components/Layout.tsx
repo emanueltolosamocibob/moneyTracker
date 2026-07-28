@@ -10,7 +10,7 @@ export default function Layout() {
     <div className="app-shell gradient-bg">
       <aside className="sidebar">
         <div className="sidebar-brand">
-          <span className="brand">MoneyTracker</span>
+          <span className="brand">AutoGasto</span>
         </div>
         <nav className="sidebar-nav">
           <NavLink to="/" end className="nav-btn">
