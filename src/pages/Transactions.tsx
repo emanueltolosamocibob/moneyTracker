@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabaseClient'
 import { useAuth } from '../lib/AuthContext'
 import type { Category, PaymentMethod, Transaction } from '../types/database'
 import { IconPlus } from '../components/icons'
+import Select from '../components/Select'
 
 const PAYMENT_METHOD_LABELS: Record<PaymentMethod, string> = {
   credit_card: 'Crédito',
@@ -19,6 +20,17 @@ function formatPaymentMethod(t: Transaction) {
   return isCard && t.card_last4 ? `${label} •• ${t.card_last4}` : label
 }
 
+// Máscara de monto tipo "POS": el usuario solo tipea dígitos, los últimos
+// dos son siempre los centavos (1290 -> $12,90; 129000 -> $1.290,00).
+function centsToNumber(digits: string) {
+  return Number(digits || '0') / 100
+}
+
+function formatAmountDigits(digits: string) {
+  if (!digits) return ''
+  return centsToNumber(digits).toLocaleString('es-AR', { style: 'currency', currency: 'ARS' })
+}
+
 export default function Transactions() {
   const { user } = useAuth()
   const [transactions, setTransactions] = useState<Transaction[]>([])
@@ -26,7 +38,7 @@ export default function Transactions() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  const [amount, setAmount] = useState('')
+  const [amountDigits, setAmountDigits] = useState('')
   const [merchant, setMerchant] = useState('')
   const [categoryId, setCategoryId] = useState('')
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod | ''>('')
@@ -53,11 +65,11 @@ export default function Transactions() {
 
   async function handleAdd(e: FormEvent) {
     e.preventDefault()
-    if (!user || !amount) return
+    if (!user || !amountDigits) return
     setSaving(true)
     const { error: insertError } = await supabase.from('transactions').insert({
       user_id: user.id,
-      amount: Number(amount),
+      amount: centsToNumber(amountDigits),
       currency: 'ARS',
       merchant: merchant || null,
       category_id: categoryId || null,
@@ -73,7 +85,7 @@ export default function Transactions() {
       setError(insertError.message)
       return
     }
-    setAmount('')
+    setAmountDigits('')
     setMerchant('')
     setCategoryId('')
     setPaymentMethod('')
@@ -87,11 +99,12 @@ export default function Transactions() {
 
       <form className="tx-form" onSubmit={handleAdd}>
         <input
-          type="number"
-          step="0.01"
+          type="text"
+          inputMode="numeric"
+          className="amount-input"
           placeholder="Monto"
-          value={amount}
-          onChange={(e) => setAmount(e.target.value)}
+          value={formatAmountDigits(amountDigits)}
+          onChange={(e) => setAmountDigits(e.target.value.replace(/\D/g, '').slice(0, 12))}
           required
         />
         <input
@@ -100,25 +113,21 @@ export default function Transactions() {
           value={merchant}
           onChange={(e) => setMerchant(e.target.value)}
         />
-        <select value={categoryId} onChange={(e) => setCategoryId(e.target.value)}>
-          <option value="">Sin categoría</option>
-          {categories.map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.name}
-            </option>
-          ))}
-        </select>
-        <select
+        <Select
+          value={categoryId}
+          onChange={setCategoryId}
+          placeholder="Sin categoría"
+          options={categories.map((c) => ({ value: c.id, label: c.name }))}
+        />
+        <Select
           value={paymentMethod}
-          onChange={(e) => setPaymentMethod(e.target.value as PaymentMethod | '')}
-        >
-          <option value="">Medio de pago</option>
-          {(Object.keys(PAYMENT_METHOD_LABELS) as PaymentMethod[]).map((pm) => (
-            <option key={pm} value={pm}>
-              {PAYMENT_METHOD_LABELS[pm]}
-            </option>
-          ))}
-        </select>
+          onChange={(v) => setPaymentMethod(v as PaymentMethod | '')}
+          placeholder="Medio de pago"
+          options={(Object.keys(PAYMENT_METHOD_LABELS) as PaymentMethod[]).map((pm) => ({
+            value: pm,
+            label: PAYMENT_METHOD_LABELS[pm],
+          }))}
+        />
         {isCardPayment && (
           <input
             type="text"

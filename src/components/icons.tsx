@@ -56,6 +56,14 @@ export function IconLogout({ size = 16 }: IconProps) {
   )
 }
 
+export function IconChevronDown({ size = 16 }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" {...base}>
+      <path d="M6 9l6 6 6-6" />
+    </svg>
+  )
+}
+
 export function IconGoogle({ size = 18 }: IconProps) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24">
