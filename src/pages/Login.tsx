@@ -9,7 +9,7 @@ export default function Login() {
   if (user) return <Navigate to="/" replace />
 
   return (
-    <div className="auth-screen">
+    <div className="auth-screen gradient-bg">
       <div className="auth-card">
         <h1>
           Tus gastos,
