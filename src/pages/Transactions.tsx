@@ -14,7 +14,8 @@ const PAYMENT_METHOD_LABELS: Record<PaymentMethod, string> = {
   other: 'Otro',
 }
 
-const PAGE_SIZE_OPTIONS = [20, 50, 100]
+type PageSize = number | 'all'
+const PAGE_SIZE_OPTIONS: PageSize[] = [20, 50, 100, 'all']
 const FETCH_LIMIT = 500
 
 function PaymentMethodCell({ t }: { t: Transaction }) {
@@ -23,10 +24,10 @@ function PaymentMethodCell({ t }: { t: Transaction }) {
   const isCard = t.payment_method === 'credit_card' || t.payment_method === 'debit_card'
   if (!isCard || !t.card_last4) return <>{label}</>
   return (
-    <>
+    <span className="tx-payment-method-inner">
       <span>{label}</span>
       <span className="tx-card-digits">•• {t.card_last4}</span>
-    </>
+    </span>
   )
 }
 
@@ -62,9 +63,10 @@ export default function Transactions() {
   const [type, setType] = useState<TransactionType>('expense')
   const [saving, setSaving] = useState(false)
   const [scanning, setScanning] = useState(false)
+  const [amountError, setAmountError] = useState<string | null>(null)
 
   const [page, setPage] = useState(0)
-  const [pageSize, setPageSize] = useState(20)
+  const [pageSize, setPageSize] = useState<PageSize>(20)
 
   const isCardPayment = paymentMethod === 'credit_card' || paymentMethod === 'debit_card'
 
@@ -100,12 +102,18 @@ export default function Transactions() {
     return { income, expense, net: income - expense }
   }, [transactions])
 
-  const pageCount = Math.max(1, Math.ceil(transactions.length / pageSize))
-  const pagedTransactions = transactions.slice(page * pageSize, page * pageSize + pageSize)
+  const pageCount = pageSize === 'all' ? 1 : Math.max(1, Math.ceil(transactions.length / pageSize))
+  const pagedTransactions =
+    pageSize === 'all' ? transactions : transactions.slice(page * pageSize, page * pageSize + pageSize)
 
   async function handleAdd(e: FormEvent) {
     e.preventDefault()
-    if (!user || !amountDigits) return
+    setAmountError(null)
+    if (!amountDigits) {
+      setAmountError('Rellená este campo.')
+      return
+    }
+    if (!user) return
     setSaving(true)
     const isIncome = type === 'income'
     const { error: insertError } = await supabase.from('transactions').insert({
@@ -153,16 +161,6 @@ export default function Transactions() {
     }
     setCategories((prev) => [...prev, data].sort((a, b) => a.name.localeCompare(b.name)))
     setCategoryId(data.id)
-  }
-
-  async function handleDeleteCategory(id: string) {
-    const { error: deleteError } = await supabase.from('categories').delete().eq('id', id)
-    if (deleteError) {
-      setError(deleteError.message)
-      return
-    }
-    setCategories((prev) => prev.filter((c) => c.id !== id))
-    if (categoryId === id) setCategoryId('')
   }
 
   async function handleCreateIncomeSource(name: string) {
@@ -214,11 +212,11 @@ export default function Transactions() {
       <div className="tx-header">
         <h2>Transacciones</h2>
         <button type="button" className="gmail-scan-btn" onClick={handleScanGmail} disabled={scanning}>
-          <IconRefresh /> {scanning ? 'Buscando...' : 'Traer de Gmail'}
+          <IconRefresh /> {scanning ? 'Sincronizando...' : 'Sincronizar'}
         </button>
       </div>
 
-      <form className="tx-form" onSubmit={handleAdd}>
+      <form className="tx-form" onSubmit={handleAdd} noValidate>
         <div className="type-toggle" role="group" aria-label="Tipo de movimiento">
           <button type="button" className={type === 'expense' ? 'active' : ''} onClick={() => setType('expense')}>
             Egreso
@@ -231,15 +229,20 @@ export default function Transactions() {
             Ingreso
           </button>
         </div>
-        <input
-          type="text"
-          inputMode="numeric"
-          className="amount-input"
-          placeholder="Monto"
-          value={formatAmountDigits(amountDigits)}
-          onChange={(e) => setAmountDigits(e.target.value.replace(/\D/g, '').slice(0, 12))}
-          required
-        />
+        <div className="tx-field">
+          <input
+            type="text"
+            inputMode="numeric"
+            className="amount-input"
+            placeholder="Monto"
+            value={formatAmountDigits(amountDigits)}
+            onChange={(e) => {
+              setAmountDigits(e.target.value.replace(/\D/g, '').slice(0, 12))
+              if (amountError) setAmountError(null)
+            }}
+          />
+          {amountError && <span className="field-error">{amountError}</span>}
+        </div>
         {type === 'income' ? (
           <Select
             value={incomeSourceId}
@@ -264,7 +267,6 @@ export default function Transactions() {
               placeholder="Sin categoría"
               options={categories.map((c) => ({ value: c.id, label: c.name, icon: getCategoryIcon(c.name) }))}
               onCreate={handleCreateCategory}
-              onDelete={handleDeleteCategory}
               createLabel="Agregar categoría"
             />
             <Select
@@ -339,9 +341,9 @@ export default function Transactions() {
                     </td>
                     <td className="tx-category">
                       {cat ? (
-                        <>
+                        <span className="tx-category-inner">
                           {getCategoryIcon(cat.name)} {cat.name}
-                        </>
+                        </span>
                       ) : (
                         '—'
                       )}
@@ -372,21 +374,28 @@ export default function Transactions() {
                     setPage(0)
                   }}
                 >
-                  {size}
+                  {size === 'all' ? 'Todo' : size}
                 </button>
               ))}
             </div>
-            <div className="tx-pagination-nav">
-              <button type="button" disabled={page === 0} onClick={() => setPage((p) => p - 1)}>
-                ‹ Anterior
-              </button>
-              <span>
-                Página {page + 1} de {pageCount}
-              </span>
-              <button type="button" disabled={page >= pageCount - 1} onClick={() => setPage((p) => p + 1)}>
-                Siguiente ›
-              </button>
-            </div>
+            {pageSize !== 'all' && (
+              <div className="tx-pagination-nav">
+                <button type="button" aria-label="Página anterior" disabled={page === 0} onClick={() => setPage((p) => p - 1)}>
+                  ‹
+                </button>
+                <span>
+                  Página {page + 1} de {pageCount}
+                </span>
+                <button
+                  type="button"
+                  aria-label="Página siguiente"
+                  disabled={page >= pageCount - 1}
+                  onClick={() => setPage((p) => p + 1)}
+                >
+                  ›
+                </button>
+              </div>
+            )}
           </div>
 
           <div className="tx-summary">

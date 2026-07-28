@@ -337,8 +337,14 @@ body {
   flex-wrap: wrap;
 }
 
-.tx-form input,
-.tx-form .select {
+/* `>` a propósito: esto fija el *ancho* de los hijos directos del form (eje
+   principal = fila). El input de Monto ya no es hijo directo (está adentro
+   de .tx-field, que tiene su propio flex-basis más abajo) — si este
+   selector lo alcanzara también, como .tx-field es flex-direction:column,
+   el mismo flex-basis se reinterpretaría como *alto* y el input se estira
+   160px para abajo. */
+.tx-form > input,
+.tx-form > .select {
   flex: 1 1 160px;
 }
 
@@ -359,6 +365,18 @@ body {
 
 .amount-input {
   font-family: var(--font-mono);
+}
+
+.tx-field {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 160px;
+}
+
+.field-error {
+  margin-top: 0.3rem;
+  color: var(--danger);
+  font-size: 0.78rem;
 }
 
 .type-toggle {
@@ -545,6 +563,7 @@ body {
   display: inline-flex;
   align-items: center;
   gap: 0.4rem;
+  margin-left: auto;
   padding: 0.5rem 1rem;
   border-radius: var(--radius);
   border: none;
@@ -577,13 +596,16 @@ body {
   font-weight: 600;
 }
 
-.tx-category {
+/* Importante: el flex va en un <span> adentro de la celda, nunca en el
+   <td> directamente — un <td> con display:flex deja de comportarse como
+   celda de tabla y descoloca toda la fila. */
+.tx-category-inner {
   display: flex;
   align-items: center;
   gap: 0.5rem;
 }
 
-.tx-category svg {
+.tx-category-inner svg {
   flex-shrink: 0;
   opacity: 0.8;
 }
@@ -611,7 +633,7 @@ body {
   letter-spacing: 0.03em;
 }
 
-.tx-payment-method {
+.tx-payment-method-inner {
   display: flex;
   justify-content: space-between;
   gap: 0.5rem;
@@ -671,6 +693,7 @@ body {
 
 .tx-summary {
   display: flex;
+  justify-content: flex-end;
   gap: 2rem;
   margin-top: 1rem;
   padding-top: 1rem;
@@ -680,6 +703,7 @@ body {
 .tx-summary > div {
   display: flex;
   flex-direction: column;
+  align-items: flex-end;
   gap: 0.2rem;
 }
 
