@@ -7,6 +7,7 @@
   --bg: #0b0d10;
   --text: #e8eaed;
   --danger: #ff6b6b;
+  --income: #4ade80;
 }
 
 * {
@@ -123,11 +124,53 @@ body {
   border-right: 1px solid rgba(255, 255, 255, 0.14);
   background: rgba(10, 8, 40, 0.28);
   backdrop-filter: blur(14px);
+  transition: width 0.2s ease, padding 0.2s ease;
+}
+
+.sidebar.collapsed {
+  width: 68px;
+  padding-left: 0.6rem;
+  padding-right: 0.6rem;
+}
+
+.sidebar-toggle {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: none;
+  color: rgba(255, 255, 255, 0.6);
+  cursor: pointer;
+  padding: 0.25rem;
+  margin-left: auto;
+}
+
+.sidebar-toggle:hover {
+  color: white;
+}
+
+.sidebar.collapsed .sidebar-toggle {
+  margin-left: 0;
+}
+
+.sidebar-toggle svg {
+  transform: rotate(90deg);
+  transition: transform 0.2s ease;
+}
+
+.sidebar.collapsed .sidebar-toggle svg {
+  transform: rotate(-90deg);
 }
 
 .sidebar-brand {
   display: flex;
   align-items: center;
+  gap: 0.6rem;
+}
+
+.sidebar.collapsed .sidebar-brand {
+  justify-content: center;
 }
 
 .brand {
@@ -203,6 +246,40 @@ body {
   background: rgba(255, 255, 255, 0.14);
 }
 
+/* Colapsado: se esconden las etiquetas de texto (con transición) y todo
+   queda centrado mostrando solo íconos + el logo. */
+.nav-label {
+  display: inline-block;
+  max-width: 200px;
+  overflow: hidden;
+  white-space: nowrap;
+  opacity: 1;
+  transition: max-width 0.2s ease, opacity 0.15s ease;
+}
+
+.sidebar.collapsed .nav-label {
+  max-width: 0;
+  opacity: 0;
+}
+
+.sidebar.collapsed .nav-btn {
+  justify-content: center;
+  gap: 0;
+  padding: 0.6rem;
+}
+
+.sidebar.collapsed .sidebar-user button {
+  gap: 0;
+}
+
+.sidebar.collapsed .sidebar-user {
+  align-items: center;
+}
+
+.sidebar.collapsed .sidebar-user button {
+  align-self: center;
+}
+
 .app-content {
   position: relative;
   z-index: 1;
@@ -251,6 +328,35 @@ body {
   font-family: var(--font-mono);
 }
 
+.type-toggle {
+  display: flex;
+  flex: 0 0 auto;
+  border-radius: var(--radius);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  overflow: hidden;
+}
+
+.type-toggle button {
+  padding: 0.5rem 0.9rem;
+  border: none;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.7);
+  font-family: inherit;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.type-toggle button.active {
+  background: rgba(255, 255, 255, 0.15);
+  color: white;
+}
+
+.type-toggle button.active.income {
+  background: rgba(74, 222, 128, 0.22);
+  color: var(--income);
+}
+
 /* --- Select custom (reemplaza al <select> nativo, ver Select.tsx) --- */
 
 .select {
@@ -289,16 +395,37 @@ body {
   list-style: none;
   border-radius: var(--radius);
   border: 1px solid rgba(255, 255, 255, 0.2);
-  background: rgba(255, 255, 255, 0.08);
+  /* A diferencia del trigger, este panel flota sobre contenido (la tabla)
+     que no es el fondo con gradiente — con el mismo translúcido de los
+     inputs, ese contenido se transparenta y se mezcla con la lista. Blur +
+     un poco más de opacidad lo separan visualmente sin perder el estilo. */
+  background: rgba(40, 32, 110, 0.75);
+  backdrop-filter: blur(10px);
   color: white;
   box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35);
 }
 
 .select-panel li {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
   padding: 0.5rem 0.6rem;
   border-radius: var(--radius);
   white-space: nowrap;
   cursor: pointer;
+}
+
+.select-panel li svg {
+  flex-shrink: 0;
+  opacity: 0.8;
+}
+
+.select-trigger-label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .select-panel li:hover {
@@ -349,14 +476,58 @@ body {
   font-weight: 600;
 }
 
-.tx-table tr.needs-review td {
-  color: var(--danger);
+.tx-category {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.tx-category svg {
+  flex-shrink: 0;
+  opacity: 0.8;
+}
+
+.review-dot {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  margin-right: 0.5rem;
+  border-radius: 50%;
+  background: var(--danger);
+  vertical-align: middle;
 }
 
 .tx-amount,
 .tx-payment-method {
   font-family: var(--font-mono);
   letter-spacing: 0.03em;
+}
+
+.tx-amount.income {
+  color: var(--income);
+}
+
+.tx-summary {
+  display: flex;
+  gap: 2rem;
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.14);
+}
+
+.tx-summary > div {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.tx-summary span {
+  color: rgba(255, 255, 255, 0.65);
+  font-size: 0.8rem;
+}
+
+.tx-summary .tx-amount {
+  font-size: 1.1rem;
 }
 
 .empty-state {

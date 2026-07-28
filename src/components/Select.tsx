@@ -1,9 +1,10 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { IconChevronDown } from './icons'
 
 export interface SelectOption {
   value: string
   label: string
+  icon?: ReactNode
 }
 
 interface SelectProps {
@@ -52,7 +53,10 @@ export default function Select({ value, onChange, options, placeholder }: Select
         aria-expanded={open}
         onClick={() => setOpen((o) => !o)}
       >
-        <span>{selected?.label ?? placeholder}</span>
+        <span className="select-trigger-label">
+          {selected?.icon}
+          {selected?.label ?? placeholder}
+        </span>
         <IconChevronDown />
       </button>
       {open && (
@@ -79,6 +83,7 @@ export default function Select({ value, onChange, options, placeholder }: Select
                 setOpen(false)
               }}
             >
+              {opt.icon}
               {opt.label}
             </li>
           ))}
