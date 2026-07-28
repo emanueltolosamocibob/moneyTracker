@@ -2,6 +2,7 @@ import { useEffect, useState, type FormEvent } from 'react'
 import { supabase } from '../lib/supabaseClient'
 import { useAuth } from '../lib/AuthContext'
 import type { Category, PaymentMethod, Transaction } from '../types/database'
+import { IconPlus } from '../components/icons'
 
 const PAYMENT_METHOD_LABELS: Record<PaymentMethod, string> = {
   credit_card: 'Crédito',
@@ -129,7 +130,13 @@ export default function Transactions() {
           />
         )}
         <button type="submit" disabled={saving}>
-          {saving ? 'Guardando...' : 'Agregar'}
+          {saving ? (
+            'Guardando...'
+          ) : (
+            <>
+              <IconPlus /> Agregar
+            </>
+          )}
         </button>
       </form>
 

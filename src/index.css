@@ -3,7 +3,7 @@
   font-family: 'Space Grotesk', system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
   --font-heading: 'Space Grotesk', system-ui, sans-serif;
   --font-mono: 'Space Mono', ui-monospace, 'SFMono-Regular', monospace;
-  --radius: 6px;
+  --radius: 2px;
   --bg: #0b0d10;
   --text: #e8eaed;
   --danger: #ff6b6b;
@@ -34,9 +34,9 @@ body {
   content: '';
   position: absolute;
   inset: 0;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
-  background-size: 180px 180px;
-  opacity: 0.3;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='1.15' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-size: 90px 90px;
+  opacity: 0.55;
   mix-blend-mode: overlay;
   pointer-events: none;
 }
@@ -84,6 +84,9 @@ body {
 }
 
 .google-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
   margin: 1.5rem 0;
   padding: 0.8rem 1.5rem;
   border-radius: var(--radius);
@@ -141,6 +144,9 @@ body {
 }
 
 .nav-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
   color: rgba(255, 255, 255, 0.85);
   text-decoration: none;
   padding: 0.6rem 0.75rem;
@@ -148,6 +154,10 @@ body {
   background: rgba(255, 255, 255, 0.06);
   border: 1px solid rgba(255, 255, 255, 0.12);
   font-weight: 600;
+}
+
+.nav-btn svg {
+  flex-shrink: 0;
 }
 
 .nav-btn:hover {
@@ -176,6 +186,9 @@ body {
 }
 
 .sidebar-user button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
   align-self: flex-start;
   background: rgba(255, 255, 255, 0.06);
   border: 1px solid rgba(255, 255, 255, 0.2);
@@ -233,6 +246,9 @@ body {
 }
 
 .tx-form button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
   padding: 0.5rem 1rem;
   border-radius: var(--radius);
   border: none;

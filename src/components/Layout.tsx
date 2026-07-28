@@ -1,6 +1,7 @@
 import { NavLink, Outlet } from 'react-router-dom'
 import { useAuth } from '../lib/AuthContext'
 import { supabase } from '../lib/supabaseClient'
+import { IconLogout, IconReceipt, IconTrendingUp, IconWallet } from './icons'
 
 export default function Layout() {
   const { user } = useAuth()
@@ -13,18 +14,20 @@ export default function Layout() {
         </div>
         <nav className="sidebar-nav">
           <NavLink to="/" end className="nav-btn">
-            Transacciones
+            <IconReceipt /> Transacciones
           </NavLink>
           <NavLink to="/budgets" className="nav-btn">
-            Presupuestos
+            <IconWallet /> Presupuestos
           </NavLink>
           <NavLink to="/investments" className="nav-btn">
-            Inversiones
+            <IconTrendingUp /> Inversiones
           </NavLink>
         </nav>
         <div className="sidebar-user">
           <span>{user?.email}</span>
-          <button onClick={() => supabase.auth.signOut()}>Salir</button>
+          <button onClick={() => supabase.auth.signOut()}>
+            <IconLogout /> Salir
+          </button>
         </div>
       </aside>
       <main className="app-content">

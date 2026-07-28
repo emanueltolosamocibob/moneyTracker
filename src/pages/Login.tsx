@@ -1,6 +1,7 @@
 import { Navigate } from 'react-router-dom'
 import { useAuth } from '../lib/AuthContext'
 import { signInWithGoogle } from '../lib/supabaseClient'
+import { IconGoogle } from '../components/icons'
 
 export default function Login() {
   const { user, loading } = useAuth()
@@ -20,7 +21,7 @@ export default function Login() {
         </h1>
         <p>Seguimiento de gastos personales, detectados solos a partir de tu Gmail.</p>
         <button className="google-btn" onClick={() => signInWithGoogle()}>
-          Continuar con Google
+          <IconGoogle /> Continuar con Google
         </button>
         <p className="auth-note">
           Vamos a pedirte acceso de solo lectura a Gmail para detectar mails de
