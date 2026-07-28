@@ -227,13 +227,20 @@ body {
   flex-wrap: wrap;
 }
 
+.tx-form input,
+.tx-form .select {
+  flex: 1 1 160px;
+}
+
 .tx-form input {
+  width: 100%;
   padding: 0.5rem;
   border-radius: var(--radius);
   border: 1px solid rgba(255, 255, 255, 0.2);
   background: rgba(255, 255, 255, 0.08);
   color: white;
   font-family: inherit;
+  font-size: 1rem;
 }
 
 .tx-form input::placeholder {
@@ -253,7 +260,9 @@ body {
 .select-trigger {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 0.5rem;
+  width: 100%;
   padding: 0.5rem;
   border-radius: var(--radius);
   border: 1px solid rgba(255, 255, 255, 0.2);
@@ -280,7 +289,8 @@ body {
   list-style: none;
   border-radius: var(--radius);
   border: 1px solid rgba(255, 255, 255, 0.2);
-  background: #1a1330;
+  background: rgba(255, 255, 255, 0.08);
+  color: white;
   box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35);
 }
 
@@ -292,12 +302,11 @@ body {
 }
 
 .select-panel li:hover {
-  background: rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.14);
 }
 
 .select-panel li.active {
-  background: white;
-  color: #1a1fb8;
+  background: rgba(255, 255, 255, 0.18);
   font-weight: 600;
 }
 
