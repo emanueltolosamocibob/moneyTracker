@@ -17,18 +17,16 @@ export default function Layout() {
   return (
     <div className="app-shell gradient-bg">
       <aside className={`sidebar${collapsed ? ' collapsed' : ''}`}>
-        <button
-          type="button"
-          className="sidebar-toggle"
-          onClick={() => setCollapsed((c) => !c)}
-          aria-label={collapsed ? 'Expandir menú' : 'Colapsar menú'}
-        >
-          <IconChevronDown size={14} />
-        </button>
-
         <div className="sidebar-brand">
-          <img src="/favicon.svg" alt="" className="brand-mark" />
           <span className="brand nav-label">AutoGasto</span>
+          <button
+            type="button"
+            className="sidebar-toggle"
+            onClick={() => setCollapsed((c) => !c)}
+            aria-label={collapsed ? 'Expandir menú' : 'Colapsar menú'}
+          >
+            <IconChevronDown size={16} />
+          </button>
         </div>
         <nav className="sidebar-nav">
           <NavLink to="/" end className="nav-btn">

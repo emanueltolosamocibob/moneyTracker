@@ -134,21 +134,24 @@ body {
 }
 
 .sidebar-toggle {
-  position: absolute;
-  top: 1.4rem;
-  right: -12px;
-  z-index: 2;
-  width: 24px;
-  height: 24px;
+  flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 50%;
-  border: 1px solid rgba(255, 255, 255, 0.25);
-  background: #2a2170;
-  color: white;
+  border: none;
+  background: none;
+  color: rgba(255, 255, 255, 0.6);
   cursor: pointer;
-  padding: 0;
+  padding: 0.25rem;
+  margin-left: auto;
+}
+
+.sidebar-toggle:hover {
+  color: white;
+}
+
+.sidebar.collapsed .sidebar-toggle {
+  margin-left: 0;
 }
 
 .sidebar-toggle svg {
@@ -166,11 +169,8 @@ body {
   gap: 0.6rem;
 }
 
-.brand-mark {
-  width: 22px;
-  height: 22px;
-  border-radius: 5px;
-  flex-shrink: 0;
+.sidebar.collapsed .sidebar-brand {
+  justify-content: center;
 }
 
 .brand {
