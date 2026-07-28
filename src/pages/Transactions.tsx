@@ -14,11 +14,17 @@ const PAYMENT_METHOD_LABELS: Record<PaymentMethod, string> = {
   other: 'Otro',
 }
 
-function formatPaymentMethod(t: Transaction) {
-  if (!t.payment_method) return '—'
+function PaymentMethodCell({ t }: { t: Transaction }) {
+  if (!t.payment_method) return <>—</>
   const label = PAYMENT_METHOD_LABELS[t.payment_method]
   const isCard = t.payment_method === 'credit_card' || t.payment_method === 'debit_card'
-  return isCard && t.card_last4 ? `${label} •• ${t.card_last4}` : label
+  if (!isCard || !t.card_last4) return <>{label}</>
+  return (
+    <>
+      <span>{label}</span>
+      <span className="tx-card-digits">•• {t.card_last4}</span>
+    </>
+  )
 }
 
 function formatCurrency(amount: number, currency: string) {
@@ -213,7 +219,9 @@ export default function Transactions() {
                         '—'
                       )}
                     </td>
-                    <td className="tx-payment-method">{formatPaymentMethod(t)}</td>
+                    <td className="tx-payment-method">
+                      <PaymentMethodCell t={t} />
+                    </td>
                     <td className={`tx-amount ${t.type === 'income' ? 'income' : ''}`}>
                       {t.type === 'expense' ? '-' : '+'}
                       {formatCurrency(t.amount, t.currency)}
@@ -235,7 +243,7 @@ export default function Transactions() {
             </div>
             <div>
               <span>Neto</span>
-              <strong className={`tx-amount ${totals.net >= 0 ? 'income' : ''}`}>
+              <strong className={`tx-amount ${totals.net >= 0 ? 'income' : 'negative'}`}>
                 {formatCurrency(totals.net, 'ARS')}
               </strong>
             </div>
