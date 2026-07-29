@@ -1,22 +1,32 @@
 import { useEffect, useState } from 'react'
-import { NavLink, Outlet } from 'react-router-dom'
+import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import { useAuth } from '../lib/AuthContext'
 import { supabase } from '../lib/supabaseClient'
-import { IconChevronDown, IconLogout, IconReceipt, IconTrendingUp, IconWallet } from './icons'
+import { IconChevronDown, IconLogout, IconMenu, IconReceipt, IconTrendingUp, IconWallet } from './icons'
 
 const COLLAPSE_KEY = 'sidebarCollapsed'
 
 export default function Layout() {
   const { user } = useAuth()
+  const location = useLocation()
   const [collapsed, setCollapsed] = useState(() => localStorage.getItem(COLLAPSE_KEY) === '1')
+  // Menú desplegable en mobile: siempre arranca cerrado, no se persiste
+  // (a diferencia de `collapsed`, que es la preferencia de sidebar angosta
+  // en desktop — son dos conceptos independientes que conviven en el mismo
+  // <aside>, ver media query en index.css).
+  const [mobileOpen, setMobileOpen] = useState(false)
 
   useEffect(() => {
     localStorage.setItem(COLLAPSE_KEY, collapsed ? '1' : '0')
   }, [collapsed])
 
+  useEffect(() => {
+    setMobileOpen(false)
+  }, [location.pathname])
+
   return (
     <div className="app-shell gradient-bg">
-      <aside className={`sidebar${collapsed ? ' collapsed' : ''}`}>
+      <aside className={`sidebar${collapsed ? ' collapsed' : ''}${mobileOpen ? ' mobile-open' : ''}`}>
         <div className="sidebar-brand">
           <span className="brand nav-label">AutoGasto</span>
           <button
@@ -26,6 +36,15 @@ export default function Layout() {
             aria-label={collapsed ? 'Expandir menú' : 'Colapsar menú'}
           >
             <IconChevronDown size={16} />
+          </button>
+          <button
+            type="button"
+            className="mobile-menu-toggle"
+            onClick={() => setMobileOpen((o) => !o)}
+            aria-label={mobileOpen ? 'Cerrar menú' : 'Abrir menú'}
+            aria-expanded={mobileOpen}
+          >
+            <IconMenu size={20} />
           </button>
         </div>
         <nav className="sidebar-nav">

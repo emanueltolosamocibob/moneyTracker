@@ -309,6 +309,7 @@ export default function Transactions() {
         </p>
       ) : (
         <>
+          <div className="tx-table-scroll">
           <table className="tx-table">
             <thead>
               <tr>
@@ -369,6 +370,7 @@ export default function Transactions() {
               })}
             </tbody>
           </table>
+          </div>
 
           <div className="tx-summary">
             <div>
