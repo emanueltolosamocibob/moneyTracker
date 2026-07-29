@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { supabase } from '../lib/supabaseClient'
 import { useAuth } from '../lib/AuthContext'
 import type { Category, IncomeSource, PaymentMethod, Transaction, TransactionType } from '../types/database'
-import { IconPlus, IconRefresh, IconX } from '../components/icons'
+import { IconChevronDown, IconPlus, IconRefresh, IconX } from '../components/icons'
 import Select from '../components/Select'
 import { getCategoryIcon } from '../lib/categoryIcons'
 
@@ -67,6 +67,9 @@ export default function Transactions() {
 
   const [page, setPage] = useState(0)
   const [pageSize, setPageSize] = useState<PageSize>(20)
+  // Acordeón del form en mobile (ver media query en index.css): en desktop
+  // el form siempre está visible y este estado se ignora vía CSS.
+  const [formOpen, setFormOpen] = useState(false)
 
   const isCardPayment = paymentMethod === 'credit_card' || paymentMethod === 'debit_card'
 
@@ -145,6 +148,7 @@ export default function Transactions() {
     setPaymentMethod('')
     setCardLast4('')
     setType('expense')
+    setFormOpen(false)
     load()
   }
 
@@ -215,7 +219,17 @@ export default function Transactions() {
         </button>
       </div>
 
-      <form className="tx-form" onSubmit={handleAdd} noValidate>
+      <button
+        type="button"
+        className={`tx-form-toggle${formOpen ? ' open' : ''}`}
+        onClick={() => setFormOpen((o) => !o)}
+        aria-expanded={formOpen}
+      >
+        <IconPlus size={14} /> Nueva transacción
+        <IconChevronDown size={16} />
+      </button>
+
+      <form className={`tx-form${formOpen ? ' open' : ''}`} onSubmit={handleAdd} noValidate>
         <div className="type-toggle" role="group" aria-label="Tipo de movimiento">
           <button type="button" className={type === 'expense' ? 'active' : ''} onClick={() => setType('expense')}>
             Egreso

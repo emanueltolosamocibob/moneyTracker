@@ -350,6 +350,10 @@ body {
   cursor: default;
 }
 
+.tx-form-toggle {
+  display: none;
+}
+
 .tx-form {
   display: flex;
   gap: 0.5rem;
@@ -834,10 +838,42 @@ body {
 
   /* Formulario de nueva transacción: en fila con flex-wrap quedaba en una
      grilla de 2 columnas desprolija en un viewport angosto — apilado a
-     ancho completo es más cómodo para tocar. */
+     ancho completo es más cómodo para tocar. Además, arranca colapsado
+     detrás de un botón para no comerse espacio antes de la lista. */
+  .tx-form-toggle {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    width: 100%;
+    margin-bottom: 1rem;
+    padding: 0.6rem 0.85rem;
+    border-radius: var(--radius);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    background: rgba(255, 255, 255, 0.08);
+    color: white;
+    font-family: inherit;
+    font-size: 0.95rem;
+    font-weight: 600;
+    cursor: pointer;
+  }
+
+  .tx-form-toggle svg:last-child {
+    margin-left: auto;
+    transition: transform 0.2s ease;
+  }
+
+  .tx-form-toggle.open svg:last-child {
+    transform: rotate(180deg);
+  }
+
   .tx-form {
+    display: none;
     flex-direction: column;
     align-items: stretch;
+  }
+
+  .tx-form.open {
+    display: flex;
   }
 
   .tx-form > input,
