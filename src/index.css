@@ -707,7 +707,7 @@ body {
 .tx-pagination {
   display: flex;
   align-items: center;
-  justify-content: flex-end;
+  justify-content: space-between;
   flex-wrap: wrap;
   gap: 0.75rem;
   margin-top: 1.5rem;
@@ -768,16 +768,6 @@ body {
 
 .tx-summary .tx-amount {
   font-size: 1.1rem;
-}
-
-.tx-summary-net span {
-  font-size: 0.9rem;
-  font-weight: 600;
-  color: rgba(255, 255, 255, 0.85);
-}
-
-.tx-summary-net .tx-amount {
-  font-size: 1.6rem;
 }
 
 .empty-state {
@@ -866,5 +856,19 @@ body {
   .tx-form > button {
     margin-left: 0;
     justify-content: center;
+  }
+
+  .tx-pagination {
+    justify-content: flex-end;
+  }
+
+  .tx-summary-net span {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: rgba(255, 255, 255, 0.85);
+  }
+
+  .tx-summary-net .tx-amount {
+    font-size: 1.6rem;
   }
 }
