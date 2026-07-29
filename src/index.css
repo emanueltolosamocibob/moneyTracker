@@ -293,6 +293,14 @@ body {
   padding: 0.25rem;
 }
 
+.mobile-menu-toggle svg {
+  transition: transform 0.2s ease;
+}
+
+.mobile-menu-toggle.open svg {
+  transform: rotate(180deg);
+}
+
 .app-content {
   position: relative;
   z-index: 1;
@@ -340,6 +348,10 @@ body {
 .gmail-scan-btn:disabled {
   opacity: 0.6;
   cursor: default;
+}
+
+.tx-form-toggle {
+  display: none;
 }
 
 .tx-form {
@@ -822,5 +834,77 @@ body {
   .app-content {
     max-width: 100%;
     padding: 1rem;
+  }
+
+  /* Formulario de nueva transacción: en fila con flex-wrap quedaba en una
+     grilla de 2 columnas desprolija en un viewport angosto — apilado a
+     ancho completo es más cómodo para tocar. Además, arranca colapsado
+     detrás de un botón para no comerse espacio antes de la lista. */
+  .tx-form-toggle {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    width: 100%;
+    margin-bottom: 1rem;
+    padding: 0.6rem 0.85rem;
+    border-radius: var(--radius);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    background: rgba(255, 255, 255, 0.08);
+    color: white;
+    font-family: inherit;
+    font-size: 0.95rem;
+    font-weight: 600;
+    cursor: pointer;
+  }
+
+  .tx-form-toggle svg:last-child {
+    margin-left: auto;
+    transition: transform 0.2s ease;
+  }
+
+  .tx-form-toggle.open svg:last-child {
+    transform: rotate(180deg);
+  }
+
+  .tx-form {
+    display: none;
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .tx-form.open {
+    display: flex;
+  }
+
+  .tx-form > input,
+  .tx-form > .select,
+  .tx-form > .tx-field,
+  .type-toggle,
+  .tx-form > button {
+    width: 100%;
+    flex: 0 0 auto;
+  }
+
+  .type-toggle button {
+    flex: 1;
+  }
+
+  .tx-form > button {
+    margin-left: 0;
+    justify-content: center;
+  }
+
+  .tx-pagination {
+    justify-content: flex-end;
+  }
+
+  .tx-summary-net span {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: rgba(255, 255, 255, 0.85);
+  }
+
+  .tx-summary-net .tx-amount {
+    font-size: 1.6rem;
   }
 }

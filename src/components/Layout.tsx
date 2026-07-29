@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import { useAuth } from '../lib/AuthContext'
 import { supabase } from '../lib/supabaseClient'
-import { IconChevronDown, IconLogout, IconMenu, IconReceipt, IconTrendingUp, IconWallet } from './icons'
+import { IconChevronDown, IconLogout, IconReceipt, IconTrendingUp, IconWallet } from './icons'
 
 const COLLAPSE_KEY = 'sidebarCollapsed'
 
@@ -39,12 +39,12 @@ export default function Layout() {
           </button>
           <button
             type="button"
-            className="mobile-menu-toggle"
+            className={`mobile-menu-toggle${mobileOpen ? ' open' : ''}`}
             onClick={() => setMobileOpen((o) => !o)}
             aria-label={mobileOpen ? 'Cerrar menú' : 'Abrir menú'}
             aria-expanded={mobileOpen}
           >
-            <IconMenu size={20} />
+            <IconChevronDown size={20} />
           </button>
         </div>
         <nav className="sidebar-nav">
