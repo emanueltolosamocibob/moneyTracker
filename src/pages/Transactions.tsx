@@ -381,7 +381,7 @@ export default function Transactions() {
               <span>Egresos</span>
               <strong className="tx-amount">{formatCurrency(totals.expense, 'ARS')}</strong>
             </div>
-            <div>
+            <div className="tx-summary-net">
               <span>Neto</span>
               <strong className={`tx-amount ${totals.net < 0 ? 'negative' : ''}`}>
                 {formatCurrency(totals.net, 'ARS')}
