@@ -407,6 +407,12 @@ body {
   flex: 1 1 160px;
 }
 
+.tx-field-label {
+  margin-bottom: 0.25rem;
+  color: rgba(255, 255, 255, 0.55);
+  font-size: 0.75rem;
+}
+
 .field-error {
   margin-top: 0.3rem;
   color: var(--danger);
