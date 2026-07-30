@@ -33,3 +33,5 @@ Thumbs.db
 
 # Supabase CLI local state
 supabase/.temp/
+
+.env*
