@@ -12,6 +12,14 @@ function formatCurrency(amount: number, currency: string) {
   return amount.toLocaleString('es-AR', { style: 'currency', currency })
 }
 
+// Mismo estilo que el monto de Transactions.tsx, pero sin la máscara de
+// centavos: acá cada dígito tipeado es un peso entero, no el último par de
+// centavos (los presupuestos se definen en pesos redondos).
+function formatWholeAmountDigits(digits: string) {
+  if (!digits) return ''
+  return Number(digits).toLocaleString('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 })
+}
+
 function todayDateStr() {
   const d = new Date()
   return toDateInputStr(d)
@@ -245,7 +253,7 @@ export default function Budgets() {
     setAutoRenew(period.auto_renew)
     const nextAmounts: Record<string, string> = {}
     for (const item of items) {
-      nextAmounts[item.category_id] = String(item.amount)
+      nextAmounts[item.category_id] = String(Math.round(item.amount))
     }
     setAmounts(nextAmounts)
     setFormError(null)
@@ -491,26 +499,15 @@ export default function Budgets() {
             </div>
 
             {periodType === 'monthly' ? (
-              <>
-                <p className="budget-form-hint">
-                  Período:{' '}
-                  {editing && period
-                    ? formatPeriodLabel('monthly', period.period_start, period.period_end)
-                    : formatPeriodLabel('monthly', monthRangeFor(todayDateStr()).start, monthRangeFor(todayDateStr()).end)}
-                </p>
-                <label className="budget-checkbox-row">
-                  <input type="checkbox" checked={autoRenew} onChange={(e) => setAutoRenew(e.target.checked)} />
-                  Reiniciar automáticamente con los mismos montos al terminar el mes
-                </label>
-              </>
+              <p className="budget-form-hint">
+                Período:{' '}
+                {editing && period
+                  ? formatPeriodLabel('monthly', period.period_start, period.period_end)
+                  : formatPeriodLabel('monthly', monthRangeFor(todayDateStr()).start, monthRangeFor(todayDateStr()).end)}
+              </p>
             ) : (
               <div className="budget-custom-range">
-                <input
-                  type="date"
-                  value={customStart}
-                  disabled={editing}
-                  onChange={(e) => setCustomStart(e.target.value)}
-                />
+                <input type="date" value={customStart} disabled={editing} onChange={(e) => setCustomStart(e.target.value)} />
                 <span>–</span>
                 <input type="date" value={customEnd} disabled={editing} onChange={(e) => setCustomEnd(e.target.value)} />
               </div>
@@ -520,19 +517,29 @@ export default function Budgets() {
               {categories.map((c) => (
                 <div className="budget-category-row" key={c.id}>
                   <span className="budget-category-label">
-                    {getCategoryIcon(c.name)} {c.name}
+                    {getCategoryIcon(c.name)}
+                    <span>{c.name}</span>
                   </span>
                   <input
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    placeholder="0"
-                    value={amounts[c.id] ?? ''}
-                    onChange={(e) => setAmounts((a) => ({ ...a, [c.id]: e.target.value }))}
+                    type="text"
+                    inputMode="numeric"
+                    className="amount-input"
+                    placeholder="$ 0"
+                    value={formatWholeAmountDigits(amounts[c.id] ?? '')}
+                    onChange={(e) =>
+                      setAmounts((a) => ({ ...a, [c.id]: e.target.value.replace(/\D/g, '').slice(0, 12) }))
+                    }
                   />
                 </div>
               ))}
             </div>
+
+            {periodType === 'monthly' && (
+              <label className="budget-checkbox-row">
+                <input type="checkbox" checked={autoRenew} onChange={(e) => setAutoRenew(e.target.checked)} />
+                Reiniciar automáticamente con los mismos montos al terminar el mes
+              </label>
+            )}
 
             {formError && <p className="error">{formError}</p>}
 

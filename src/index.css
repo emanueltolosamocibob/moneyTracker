@@ -456,6 +456,17 @@ body {
   color: var(--income);
 }
 
+/* Mensual/Personalizado son las únicas dos opciones: que se repartan el
+   ancho del contenedor mitad y mitad, en vez de quedar apretadas a la
+   izquierda por su contenido. */
+.budget-form .type-toggle {
+  width: 100%;
+}
+
+.budget-form .type-toggle button {
+  flex: 1;
+}
+
 /* --- Select custom (reemplaza al <select> nativo, ver Select.tsx) --- */
 
 .select {
@@ -849,14 +860,15 @@ body {
   background: rgba(10, 8, 30, 0.55);
 }
 
+/* El fondo (gradiente + grano) lo pone la clase compartida .gradient-bg,
+   la misma que usan el login y el shell de la app — para que el diálogo se
+   sienta parte de la misma superficie en vez de un panel plano aparte. */
 .modal-panel {
   width: 100%;
   max-width: 400px;
   padding: 1.5rem;
   border-radius: var(--radius);
   border: 1px solid rgba(255, 255, 255, 0.2);
-  background: rgba(40, 32, 110, 0.9);
-  backdrop-filter: blur(14px);
   color: white;
   box-shadow: 0 20px 50px rgba(0, 0, 0, 0.45);
 }
@@ -1100,6 +1112,22 @@ body {
   font-size: 0.9rem;
 }
 
+/* Mismo estilo que .tx-form input en Transactions.tsx (fecha, monto, etc.) */
+.budget-form input:not([type='checkbox']) {
+  width: 100%;
+  padding: 0.5rem;
+  border-radius: var(--radius);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.08);
+  color: white;
+  font-family: inherit;
+  font-size: 1rem;
+}
+
+.budget-form input::placeholder {
+  color: rgba(255, 255, 255, 0.55);
+}
+
 .budget-checkbox-row {
   display: flex;
   align-items: center;
@@ -1124,7 +1152,34 @@ body {
   gap: 0.5rem;
   max-height: 260px;
   overflow-y: auto;
+  /* Sin esto, dejar overflow-x en su default (visible) hace que el
+     navegador lo compute como "auto" igual (regla de la spec cuando el
+     otro eje no es "visible"), y aparece una scrollbar horizontal de
+     sobra si alguna fila (nombre de categoría largo) es un poco más
+     ancha que el modal. */
+  overflow-x: hidden;
   padding-right: 0.25rem;
+  /* Mismo estilo que .tx-table-scroll, pero vertical (width en vez de height). */
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.35) rgba(255, 255, 255, 0.08);
+}
+
+.budget-category-list::-webkit-scrollbar {
+  width: 8px;
+}
+
+.budget-category-list::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 4px;
+}
+
+.budget-category-list::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.35);
+  border-radius: 4px;
+}
+
+.budget-category-list::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.55);
 }
 
 .budget-category-row {
@@ -1138,7 +1193,16 @@ body {
   display: flex;
   align-items: center;
   gap: 0.5rem;
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
   color: rgba(255, 255, 255, 0.85);
+}
+
+.budget-category-label span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .budget-category-label svg {
@@ -1146,9 +1210,11 @@ body {
   opacity: 0.8;
 }
 
-.budget-category-row input {
+/* Más específico que ".budget-form input:not([type='checkbox'])" (que da
+   width:100%) para que el ancho fijo de acá gane. */
+.budget-form .budget-category-row input {
   width: 110px;
-  flex-shrink: 0;
+  flex: 0 0 auto;
 }
 
 .modal-actions button.primary {
