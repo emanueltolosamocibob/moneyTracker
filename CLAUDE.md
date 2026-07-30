@@ -73,6 +73,20 @@ Transactions get deduped by a `unique(user_id, source_email_id)` constraint — 
 
 **CSS pitfall already hit twice in this codebase**: never set `display: flex` directly on a `<td>` — it drops the element's table-cell behavior and misaligns the whole row. Put the flex layout on an inner `<span>`/`<div>` instead. Related: if that inner wrapper has `flex-direction: column`, any `flex-basis` set on its child via a *different*, broader selector (e.g. a generic `.form input { flex: 1 1 160px }` meant for row siblings) gets reinterpreted as a height instead of a width, because flex-basis follows the container's main axis. Scope sizing rules to direct children (`.form > input`) when the DOM nesting isn't flat.
 
+**Another one**: `.tx-form`'s direct children are stretched to the tallest sibling's height (default `align-items: stretch`) — but that only grows a *wrapper* div like `.tx-field` or `.select`, not the actual `<input>`/`.select-trigger` inside it, which keeps its own shorter natural height. Any field wrapped in an extra div needs its inner control explicitly sized (`flex: 1` in these cases) to actually fill that stretched space, or it'll sit a couple px shorter than bare siblings like Comercio or the Agregar button.
+
+### Mobile layout (< 720px)
+
+Below 720px (see the `@media` block at the end of `src/index.css`), several things change together, all independent of each other's state:
+- The sidebar (`Layout.tsx`) collapses into a top bar; `mobileOpen` state (separate from desktop's icon-only `collapsed` toggle) shows/hides the nav + user section as a dropdown, closing automatically on route change. The toggle icon is a chevron that flips 180° via a `.open` class, not a hamburger.
+- The new-transaction form (`Transactions.tsx`) starts collapsed behind a "+ Nueva transacción" toggle (`formOpen` state), closing again after a successful add. Desktop always shows it expanded.
+- The transactions table scrolls horizontally inside its own `.tx-table-scroll` wrapper (custom-styled scrollbar, `min-width: 640px` on the table itself) instead of overflowing the page — `.app-shell` has `overflow: hidden`, so without that wrapper there'd be no way to reach the clipped content. Table cells are `white-space: nowrap` for the same reason: they're meant to scroll, not wrap onto a second line.
+- `.app-shell`/`.auth-screen` use `100dvh`, not just `100vh` — mobile browser chrome (address bar showing/hiding) makes plain `100vh` undershoot the real visible height, leaving a gap of near-black `body` background below the gradient when content is short.
+
+### Modal component
+
+`src/components/Modal.tsx` is a generic full-screen overlay (translucent gray backdrop + glass panel, `position: fixed`, blocks all clicks including on the sidebar) — used for the Gmail-delete confirmation in `Transactions.tsx` and the "Sincronizando con Gmail..." blocking overlay shown for the duration of a scan. Not a native `<dialog>` or third-party lib, to match the app's own translucent aesthetic instead of OS-drawn chrome (same reasoning as the custom Select above).
+
 ### Gradient background
 
 `.gradient-bg` (in `src/index.css`) is the shared diagonal gradient + SVG-turbulence grain texture used on both the login screen and the app shell. It's applied as a class, not hardcoded per page, so login and the logged-in app stay visually consistent.
