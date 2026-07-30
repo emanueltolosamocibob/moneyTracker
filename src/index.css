@@ -411,6 +411,16 @@ body {
   flex: 1 1 160px;
 }
 
+/* .tx-form estira sus hijos directos a la altura del más alto (align-items:
+   stretch, el default) — pero eso solo agranda el <div> .tx-field, no el
+   <input> de adentro, que se queda con su alto natural y termina ~2px más
+   bajo que un input sin wrapper (ej. Comercio). flex:1 en el eje principal
+   (vertical, porque .tx-field es column) hace que el input ocupe todo el
+   alto ya estirado del wrapper. */
+.tx-field input {
+  flex: 1;
+}
+
 .field-error {
   margin-top: 0.3rem;
   color: var(--danger);
@@ -450,6 +460,13 @@ body {
 
 .select {
   position: relative;
+  /* Mismo motivo que .tx-field más arriba: sin esto, .select-trigger se
+     queda con su alto natural aunque .tx-form estire este <div> a la
+     altura del hijo más alto de la fila. display:flex acá hace que
+     align-items:stretch (default) estire el trigger a ese alto — el
+     .select-panel (dropdown) no se ve afectado porque es position:absolute,
+     fuera del flujo normal. */
+  display: flex;
 }
 
 .select-trigger {
