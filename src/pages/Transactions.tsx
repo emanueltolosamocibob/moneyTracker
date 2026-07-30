@@ -287,12 +287,10 @@ export default function Transactions() {
           />
           {amountError && <span className="field-error">{amountError}</span>}
         </div>
-        <input
-          type="date"
-          aria-label="Fecha"
-          value={occurredAt}
-          onChange={(e) => setOccurredAt(e.target.value)}
-        />
+        <div className="tx-field">
+          <span className="tx-field-label">Fecha</span>
+          <input type="date" value={occurredAt} onChange={(e) => setOccurredAt(e.target.value)} />
+        </div>
         {type === 'income' ? (
           <Select
             value={incomeSourceId}
