@@ -12,17 +12,17 @@ type Connection = { user_id: string; refresh_token: string; last_scanned_at: str
 export async function scanGmailForUser(admin: Admin, conn: Connection): Promise<string> {
   const accessToken = await refreshAccessToken(conn.refresh_token)
 
-  // Nunca busca más atrás que los últimos 3 días (aunque last_scanned_at
-  // sea más viejo, o sea la primera sincronización de la cuenta) — ventana
-  // corta a propósito para limitar cuántos mails (y por lo tanto cuántas
-  // llamadas al LLM) puede traer una sola corrida, dado el rate limit de los
-  // free tiers de LLM. Dentro de esa ventana sigue siendo incremental para
-  // no reprocesar (y volver a gastar LLM en) los mismos mails.
-  const SCAN_WINDOW_DAYS = 3
-  const windowFloor = new Date()
-  windowFloor.setDate(windowFloor.getDate() - SCAN_WINDOW_DAYS)
+  // Nunca busca más atrás que el 1° del mes actual (aunque last_scanned_at
+  // sea de un mes anterior, o sea la primera sincronización de la cuenta) —
+  // pero dentro del mes sigue siendo incremental para no reprocesar (y
+  // volver a gastar LLM en) los mismos mails en cada corrida. Ya no hace
+  // falta acotar más que eso: Gemini directo (ver categorize.ts) tiene
+  // bastante más margen que el free tier de AI Gateway.
+  const startOfMonth = new Date()
+  startOfMonth.setDate(1)
+  startOfMonth.setHours(0, 0, 0, 0)
   const lastScanned = conn.last_scanned_at ? new Date(conn.last_scanned_at) : null
-  const since = lastScanned && lastScanned > windowFloor ? lastScanned.toISOString() : windowFloor.toISOString()
+  const since = lastScanned && lastScanned > startOfMonth ? lastScanned.toISOString() : startOfMonth.toISOString()
 
   const query = buildGmailQuery(since)
   const messageIds = await listMessageIds(accessToken, query)

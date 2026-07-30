@@ -4,6 +4,7 @@ import { useAuth } from '../lib/AuthContext'
 import type { Category, IncomeSource, PaymentMethod, Transaction, TransactionType } from '../types/database'
 import { IconChevronDown, IconPlus, IconRefresh, IconX } from '../components/icons'
 import Select from '../components/Select'
+import Modal from '../components/Modal'
 import { getCategoryIcon } from '../lib/categoryIcons'
 
 const PAYMENT_METHOD_LABELS: Record<PaymentMethod, string> = {
@@ -46,6 +47,20 @@ function formatAmountDigits(digits: string) {
   return formatCurrency(centsToNumber(digits), 'ARS')
 }
 
+function todayDateInput() {
+  return new Date().toISOString().slice(0, 10)
+}
+
+// new Date('YYYY-MM-DD') parsea como medianoche UTC, no local — con Argentina
+// en UTC-3 eso corre la fecha un día para atrás al mostrarla de vuelta con
+// toLocaleDateString. Construyendo con año/mes/día sueltos, Date usa
+// medianoche local, así que el viaje de ida y vuelta conserva la fecha que
+// eligió el usuario.
+function dateInputToISO(dateStr: string) {
+  const [y, m, d] = dateStr.split('-').map(Number)
+  return new Date(y, m - 1, d).toISOString()
+}
+
 export default function Transactions() {
   const { user } = useAuth()
   const [transactions, setTransactions] = useState<Transaction[]>([])
@@ -55,6 +70,7 @@ export default function Transactions() {
   const [error, setError] = useState<string | null>(null)
 
   const [amountDigits, setAmountDigits] = useState('')
+  const [occurredAt, setOccurredAt] = useState(todayDateInput)
   const [merchant, setMerchant] = useState('')
   const [categoryId, setCategoryId] = useState('')
   const [incomeSourceId, setIncomeSourceId] = useState('')
@@ -70,6 +86,8 @@ export default function Transactions() {
   // Acordeón del form en mobile (ver media query en index.css): en desktop
   // el form siempre está visible y este estado se ignora vía CSS.
   const [formOpen, setFormOpen] = useState(false)
+  // Transacción de Gmail pendiente de confirmar borrado (ver handleDeleteTransaction).
+  const [pendingDelete, setPendingDelete] = useState<Transaction | null>(null)
 
   const isCardPayment = paymentMethod === 'credit_card' || paymentMethod === 'debit_card'
 
@@ -126,7 +144,7 @@ export default function Transactions() {
       merchant: isIncome ? null : merchant || null,
       category_id: isIncome ? null : categoryId || null,
       income_source_id: isIncome ? incomeSourceId || null : null,
-      occurred_at: new Date().toISOString(),
+      occurred_at: dateInputToISO(occurredAt),
       type,
       source: 'manual',
       needs_review: isIncome ? !incomeSourceId : !categoryId,
@@ -142,6 +160,7 @@ export default function Transactions() {
       return
     }
     setAmountDigits('')
+    setOccurredAt(todayDateInput())
     setMerchant('')
     setCategoryId('')
     setIncomeSourceId('')
@@ -182,17 +201,19 @@ export default function Transactions() {
     setIncomeSourceId(data.id)
   }
 
-  async function handleDeleteTransaction(t: Transaction) {
+  function handleDeleteTransaction(t: Transaction) {
+    // El scan es incremental (last_scanned_at avanza en cada corrida
+    // exitosa) — borrar esta fila no hace que el mail vuelva a entrar en
+    // la ventana de escaneo, así que se pierde para siempre salvo que se
+    // resetee la conexión a mano. Para manuales, borra directo sin avisar.
     if (t.source === 'gmail') {
-      // El scan es incremental (last_scanned_at avanza en cada corrida
-      // exitosa) — borrar esta fila no hace que el mail vuelva a entrar en
-      // la ventana de escaneo, así que se pierde para siempre salvo que se
-      // resetee la conexión a mano.
-      const confirmed = window.confirm(
-        'Esta transacción vino de un mail de Gmail. Si la eliminás, no se va a volver a sincronizar sola — el escaneo no vuelve a mirar mails ya procesados. ¿Eliminar igual?',
-      )
-      if (!confirmed) return
+      setPendingDelete(t)
+      return
     }
+    void deleteTransaction(t)
+  }
+
+  async function deleteTransaction(t: Transaction) {
     const { error: deleteError } = await supabase.from('transactions').delete().eq('id', t.id)
     if (deleteError) {
       setError(deleteError.message)
@@ -266,6 +287,12 @@ export default function Transactions() {
           />
           {amountError && <span className="field-error">{amountError}</span>}
         </div>
+        <input
+          type="date"
+          aria-label="Fecha"
+          value={occurredAt}
+          onChange={(e) => setOccurredAt(e.target.value)}
+        />
         {type === 'income' ? (
           <Select
             value={incomeSourceId}
@@ -450,6 +477,41 @@ export default function Transactions() {
             )}
           </div>
         </>
+      )}
+
+      {pendingDelete && (
+        <Modal>
+          <h3>Eliminar transacción de Gmail</h3>
+          <p>
+            Esta transacción vino de un mail de Gmail. Si la eliminás, no se va a volver a sincronizar sola — el
+            escaneo no vuelve a mirar mails ya procesados.
+          </p>
+          <div className="modal-actions">
+            <button type="button" onClick={() => setPendingDelete(null)}>
+              Cancelar
+            </button>
+            <button
+              type="button"
+              className="danger"
+              onClick={() => {
+                const t = pendingDelete
+                setPendingDelete(null)
+                void deleteTransaction(t)
+              }}
+            >
+              Eliminar
+            </button>
+          </div>
+        </Modal>
+      )}
+
+      {scanning && (
+        <Modal>
+          <div className="modal-panel-sync">
+            <IconRefresh size={28} />
+            <p>Sincronizando con Gmail...</p>
+          </div>
+        </Modal>
       )}
     </div>
   )
