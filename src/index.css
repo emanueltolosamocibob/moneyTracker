@@ -607,6 +607,30 @@ body {
   width: 100%;
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
+  /* Firefox: no tiene ::-webkit-scrollbar, se estiliza acá aparte. */
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.35) rgba(255, 255, 255, 0.08);
+}
+
+/* Chrome/Safari/Edge (desktop y Android). iOS Safari usa una scrollbar
+   overlay dibujada por el sistema que ignora estos estilos — ahí no hay
+   forma de personalizarla desde CSS. */
+.tx-table-scroll::-webkit-scrollbar {
+  height: 8px;
+}
+
+.tx-table-scroll::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 4px;
+}
+
+.tx-table-scroll::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.35);
+  border-radius: 4px;
+}
+
+.tx-table-scroll::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.55);
 }
 
 .tx-table {
