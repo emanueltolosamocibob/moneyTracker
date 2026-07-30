@@ -182,13 +182,23 @@ export default function Transactions() {
     setIncomeSourceId(data.id)
   }
 
-  async function handleDeleteTransaction(id: string) {
-    const { error: deleteError } = await supabase.from('transactions').delete().eq('id', id)
+  async function handleDeleteTransaction(t: Transaction) {
+    if (t.source === 'gmail') {
+      // El scan es incremental (last_scanned_at avanza en cada corrida
+      // exitosa) — borrar esta fila no hace que el mail vuelva a entrar en
+      // la ventana de escaneo, así que se pierde para siempre salvo que se
+      // resetee la conexión a mano.
+      const confirmed = window.confirm(
+        'Esta transacción vino de un mail de Gmail. Si la eliminás, no se va a volver a sincronizar sola — el escaneo no vuelve a mirar mails ya procesados. ¿Eliminar igual?',
+      )
+      if (!confirmed) return
+    }
+    const { error: deleteError } = await supabase.from('transactions').delete().eq('id', t.id)
     if (deleteError) {
       setError(deleteError.message)
       return
     }
-    setTransactions((prev) => prev.filter((t) => t.id !== id))
+    setTransactions((prev) => prev.filter((tx) => tx.id !== t.id))
   }
 
   async function handleScanGmail() {
@@ -374,7 +384,7 @@ export default function Transactions() {
                         type="button"
                         className="tx-delete-btn"
                         aria-label="Eliminar transacción"
-                        onClick={() => handleDeleteTransaction(t.id)}
+                        onClick={() => handleDeleteTransaction(t)}
                       >
                         <IconX size={14} />
                       </button>
