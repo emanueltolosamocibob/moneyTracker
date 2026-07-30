@@ -6,21 +6,34 @@ import { extractAndCategorize, NEW_CATEGORY_CONFIDENCE_THRESHOLD } from './categ
 type Admin = ReturnType<typeof supabaseAdmin>
 type Connection = { user_id: string; refresh_token: string; last_scanned_at: string | null }
 
+function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
+// Las cuentas de AI Gateway sin créditos pagos tienen un límite bajo de
+// requests por minuto. Este loop llama al LLM una vez (a veces dos, si hace
+// falta investigar el comercio) por cada mail — sin este respiro entre
+// llamadas, un usuario con varios mails en la ventana de escaneo se comía un
+// 429 (GatewayRateLimitError) a mitad de la corrida.
+const LLM_CALL_DELAY_MS = 3000
+
 // Compartido entre el cron (recorre todas las conexiones) y el endpoint
 // manual /api/gmail/scan (una sola, la del usuario logueado) — ver
 // api/cron/scan-gmail.ts y api/gmail/scan.ts.
 export async function scanGmailForUser(admin: Admin, conn: Connection): Promise<string> {
   const accessToken = await refreshAccessToken(conn.refresh_token)
 
-  // Nunca busca más atrás que el 1° del mes actual (aunque last_scanned_at
-  // sea de un mes anterior, o sea la primera sincronización de la cuenta) —
-  // pero dentro del mes sigue siendo incremental para no reprocesar (y
-  // volver a gastar LLM en) los mismos mails en cada corrida.
-  const startOfMonth = new Date()
-  startOfMonth.setDate(1)
-  startOfMonth.setHours(0, 0, 0, 0)
+  // Nunca busca más atrás que los últimos 15 días (aunque last_scanned_at
+  // sea más viejo, o sea la primera sincronización de la cuenta) — ventana
+  // corta a propósito para limitar cuántos mails (y por lo tanto cuántas
+  // llamadas al LLM) puede traer una sola corrida, dado el rate limit del
+  // free tier de AI Gateway. Dentro de esa ventana sigue siendo incremental
+  // para no reprocesar (y volver a gastar LLM en) los mismos mails.
+  const SCAN_WINDOW_DAYS = 15
+  const windowFloor = new Date()
+  windowFloor.setDate(windowFloor.getDate() - SCAN_WINDOW_DAYS)
   const lastScanned = conn.last_scanned_at ? new Date(conn.last_scanned_at) : null
-  const since = lastScanned && lastScanned > startOfMonth ? lastScanned.toISOString() : startOfMonth.toISOString()
+  const since = lastScanned && lastScanned > windowFloor ? lastScanned.toISOString() : windowFloor.toISOString()
 
   const query = buildGmailQuery(since)
   const messageIds = await listMessageIds(accessToken, query)
@@ -38,10 +51,14 @@ export async function scanGmailForUser(admin: Admin, conn: Connection): Promise<
   const otrosCategory = categories.find((c) => c.name.toLowerCase() === 'otros')
 
   let inserted = 0
+  let isFirstLlmCall = true
 
   for (const messageId of messageIds) {
     const text = await getMessagePlainText(accessToken, messageId)
     if (!text) continue
+
+    if (!isFirstLlmCall) await sleep(LLM_CALL_DELAY_MS)
+    isFirstLlmCall = false
 
     const extracted = await extractAndCategorize(
       text,
