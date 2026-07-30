@@ -10,11 +10,11 @@ function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms))
 }
 
-// Las cuentas de AI Gateway sin créditos pagos tienen un límite bajo de
-// requests por minuto. Este loop llama al LLM una vez (a veces dos, si hace
-// falta investigar el comercio) por cada mail — sin este respiro entre
-// llamadas, un usuario con varios mails en la ventana de escaneo se comía un
-// 429 (GatewayRateLimitError) a mitad de la corrida.
+// Los free tiers de LLM (Vercel AI Gateway, y también el de Gemini vía API
+// key propia) limitan requests por minuto. Este loop llama al LLM una vez (a
+// veces dos, si hace falta investigar el comercio) por cada mail — sin este
+// respiro entre llamadas, un usuario con varios mails en la ventana de
+// escaneo se comía un 429 a mitad de la corrida.
 const LLM_CALL_DELAY_MS = 3000
 
 // Compartido entre el cron (recorre todas las conexiones) y el endpoint
@@ -23,13 +23,13 @@ const LLM_CALL_DELAY_MS = 3000
 export async function scanGmailForUser(admin: Admin, conn: Connection): Promise<string> {
   const accessToken = await refreshAccessToken(conn.refresh_token)
 
-  // Nunca busca más atrás que los últimos 15 días (aunque last_scanned_at
+  // Nunca busca más atrás que los últimos 3 días (aunque last_scanned_at
   // sea más viejo, o sea la primera sincronización de la cuenta) — ventana
   // corta a propósito para limitar cuántos mails (y por lo tanto cuántas
-  // llamadas al LLM) puede traer una sola corrida, dado el rate limit del
-  // free tier de AI Gateway. Dentro de esa ventana sigue siendo incremental
-  // para no reprocesar (y volver a gastar LLM en) los mismos mails.
-  const SCAN_WINDOW_DAYS = 15
+  // llamadas al LLM) puede traer una sola corrida, dado el rate limit de los
+  // free tiers de LLM. Dentro de esa ventana sigue siendo incremental para
+  // no reprocesar (y volver a gastar LLM en) los mismos mails.
+  const SCAN_WINDOW_DAYS = 3
   const windowFloor = new Date()
   windowFloor.setDate(windowFloor.getDate() - SCAN_WINDOW_DAYS)
   const lastScanned = conn.last_scanned_at ? new Date(conn.last_scanned_at) : null
