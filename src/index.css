@@ -317,7 +317,11 @@ body {
   flex: 1;
   min-width: 0;
   padding: 1.5rem 2rem;
-  max-width: 960px;
+  /* 960px se quedaba corto para el form de nueva transacción con los 6
+     campos + botón en una sola fila (Egreso/Ingreso, Fecha, Monto,
+     Comercio, Categoría, Medio de pago) — "Medio de pago" terminaba
+     solo en la fila de abajo. */
+  max-width: 1200px;
   margin: 0 auto;
   color: white;
 }
@@ -405,12 +409,6 @@ body {
   display: flex;
   flex-direction: column;
   flex: 1 1 160px;
-}
-
-.tx-field-label {
-  margin-bottom: 0.25rem;
-  color: rgba(255, 255, 255, 0.55);
-  font-size: 0.75rem;
 }
 
 .field-error {
