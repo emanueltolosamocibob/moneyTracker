@@ -861,6 +861,14 @@ body {
   box-shadow: 0 20px 50px rgba(0, 0, 0, 0.45);
 }
 
+.modal-panel-wide {
+  max-width: 720px;
+}
+
+.modal-panel .tx-table-scroll {
+  margin-bottom: 1.25rem;
+}
+
 .modal-panel h3 {
   margin: 0 0 0.75rem;
   font-family: var(--font-heading);
@@ -876,6 +884,7 @@ body {
 
 .modal-actions {
   display: flex;
+  flex-wrap: wrap;
   justify-content: flex-end;
   gap: 0.6rem;
 }
@@ -930,6 +939,226 @@ body {
   to {
     transform: rotate(360deg);
   }
+}
+
+/* --- Presupuestos --- */
+
+.budget-header-actions {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.modal-actions-start {
+  margin-right: auto;
+}
+
+.budget-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1rem;
+  margin-top: 1rem;
+  padding: 1.5rem;
+  border-radius: var(--radius);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.budget-empty p {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.75);
+}
+
+.budget-empty button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.5rem 1rem;
+  border-radius: var(--radius);
+  border: none;
+  background: rgba(255, 255, 255, 0.9);
+  color: #1a1fb8;
+  font-weight: 700;
+  font-family: inherit;
+  font-size: 1rem;
+  cursor: pointer;
+}
+
+.budget-empty button:hover {
+  background: #f4f4ff;
+}
+
+.budget-summary {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 1.5rem;
+  margin-top: 1rem;
+}
+
+.budget-summary > div {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.budget-summary-spent {
+  align-items: flex-end;
+  text-align: right;
+}
+
+.budget-summary span {
+  color: rgba(255, 255, 255, 0.65);
+  font-size: 0.8rem;
+}
+
+.budget-summary-amount {
+  font-family: var(--font-mono);
+  font-size: 2rem;
+  letter-spacing: 0.01em;
+}
+
+.budget-period-label {
+  margin: 0.25rem 0 1.5rem;
+  color: rgba(255, 255, 255, 0.65);
+  font-size: 0.9rem;
+}
+
+.budget-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 1rem;
+}
+
+.budget-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 1.25rem 0.75rem;
+  border-radius: var(--radius);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.06);
+  text-align: center;
+}
+
+.budget-ring-wrap {
+  position: relative;
+  display: inline-flex;
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.budget-ring-wrap.warn {
+  color: var(--warning);
+}
+
+.budget-ring-wrap.over {
+  color: var(--danger);
+}
+
+.budget-ring-track {
+  stroke: rgba(255, 255, 255, 0.14);
+}
+
+.budget-ring-fill {
+  stroke: currentColor;
+  stroke-linecap: round;
+  transition: stroke-dashoffset 0.3s ease;
+}
+
+.budget-ring-icon {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+}
+
+.budget-card-spent {
+  font-family: var(--font-mono);
+}
+
+.budget-card-title {
+  color: rgba(255, 255, 255, 0.75);
+  font-size: 0.85rem;
+}
+
+.budget-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  width: 100%;
+  max-width: 420px;
+}
+
+.budget-form-hint {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.75);
+  font-size: 0.9rem;
+}
+
+.budget-checkbox-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 0.88rem;
+}
+
+.budget-custom-range {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.budget-custom-range input {
+  flex: 1;
+}
+
+.budget-category-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  max-height: 260px;
+  overflow-y: auto;
+  padding-right: 0.25rem;
+}
+
+.budget-category-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.budget-category-label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.budget-category-label svg {
+  flex-shrink: 0;
+  opacity: 0.8;
+}
+
+.budget-category-row input {
+  width: 110px;
+  flex-shrink: 0;
+}
+
+.modal-actions button.primary {
+  background: rgba(255, 255, 255, 0.9);
+  color: #1a1fb8;
+  border-color: transparent;
+}
+
+.modal-actions button.primary:hover {
+  background: #f4f4ff;
 }
 
 /* Mobile: la sidebar pasa de columna lateral fija a una barra superior
@@ -1061,5 +1290,17 @@ body {
 
   .tx-summary-net .tx-amount {
     font-size: 1.6rem;
+  }
+
+  .budget-summary {
+    justify-content: space-between;
+  }
+
+  .budget-summary-amount {
+    font-size: 1.4rem;
+  }
+
+  .budget-grid {
+    grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
   }
 }

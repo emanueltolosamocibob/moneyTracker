@@ -46,11 +46,23 @@ export interface Transaction {
   created_at: string
 }
 
-export interface Budget {
+export type BudgetPeriodType = 'monthly' | 'custom'
+
+export interface BudgetPeriod {
   id: string
   user_id: string
-  category_id: string | null
-  month: string // 'YYYY-MM-01'
+  period_type: BudgetPeriodType
+  period_start: string // 'YYYY-MM-DD'
+  period_end: string // 'YYYY-MM-DD'
+  auto_renew: boolean
+  created_at: string
+}
+
+export interface BudgetItem {
+  id: string
+  budget_period_id: string
+  user_id: string
+  category_id: string
   amount: number
   created_at: string
 }
@@ -96,10 +108,16 @@ export interface Database {
         Update: Partial<Transaction>
         Relationships: []
       }
-      budgets: {
-        Row: Budget
-        Insert: Partial<Budget>
-        Update: Partial<Budget>
+      budget_periods: {
+        Row: BudgetPeriod
+        Insert: Partial<BudgetPeriod>
+        Update: Partial<BudgetPeriod>
+        Relationships: []
+      }
+      budget_items: {
+        Row: BudgetItem
+        Insert: Partial<BudgetItem>
+        Update: Partial<BudgetItem>
         Relationships: []
       }
       investments: {
