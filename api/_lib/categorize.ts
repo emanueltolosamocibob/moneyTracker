@@ -1,5 +1,5 @@
 import { generateObject, generateText, stepCountIs } from 'ai'
-import { openai } from '@ai-sdk/openai'
+import { google } from '@ai-sdk/google'
 import { z } from 'zod'
 
 const extractionSchema = z.object({
@@ -40,14 +40,14 @@ export const NEW_CATEGORY_CONFIDENCE_THRESHOLD = 0.85
 
 async function runExtraction(emailText: string, categoryNames: string[], merchantResearch?: string) {
   const { object } = await generateObject({
-    // String plano: resuelto vía Vercel AI Gateway (no requiere SDK del
-    // provider ni key propia en despliegues de Vercel). Nota: en el plan
-    // free de AI Gateway, los modelos de Anthropic devuelven "Free tier
-    // users do not have access to this model" incluso con tarjeta
-    // cargada — hay que pasar a créditos pagos para usarlos. Mientras
-    // tanto usamos un modelo de OpenAI, que sí está disponible en el free
-    // tier (confirmado probando directo contra la cuenta real).
-    model: 'openai/gpt-5.4-mini',
+    // Provider directo de Google (no pasa por Vercel AI Gateway): la cuenta
+    // de AI Gateway está en el plan free, que además de bloquear modelos de
+    // Anthropic ("Free tier users do not have access to this model") tiene
+    // un rate limit de requests/minuto muy bajo que un escaneo con varios
+    // mails supera fácil. Gemini vía API key propia de Google AI Studio
+    // (GOOGLE_GENERATIVE_AI_API_KEY) tiene un free tier real, sin tarjeta,
+    // con límites más generosos.
+    model: google('gemini-3.6-flash'),
     schema: extractionSchema,
     prompt: `Analizá este email de banco/billetera y extraé los datos del pago o transferencia.
 Si el mail no confirma un pago real (ej. es publicidad, resumen mensual, o aviso genérico), marcá is_payment_confirmation en false.
@@ -74,9 +74,9 @@ ${merchantResearch ? `\nInformación adicional sobre el comercio (de una búsque
 async function researchMerchant(merchant: string): Promise<string | null> {
   try {
     const { text } = await generateText({
-      model: 'openai/gpt-5.4-mini',
+      model: google('gemini-3.6-flash'),
       tools: {
-        web_search: openai.tools.webSearch({}),
+        web_search: google.tools.googleSearch({}),
       },
       stopWhen: stepCountIs(4),
       prompt: `El texto "${merchant}" es el nombre de un comercio tal como aparece en un resumen de tarjeta o billetera argentina (puede venir truncado, o con el prefijo de un procesador de pagos como MERPAGO/MP). Buscá en internet a qué comercio corresponde y a qué rubro pertenece (ej: supermercado, restaurante, farmacia, transporte, streaming, etc). Respondé en 2-3 líneas, en español, con el nombre real del comercio si lo identificás y su rubro. Si no encontrás nada confiable, decilo explícitamente.`,
