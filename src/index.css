@@ -47,6 +47,13 @@ body {
 
 .auth-screen {
   min-height: 100vh;
+  /* 100vh en mobile se calcula sin contar la barra de direcciones del
+     navegador (o con distintos criterios según el browser), así que el
+     fondo se queda corto y se ve negro (el body de atrás) debajo una vez
+     que la barra se colapsa/expande. 100dvh sigue el viewport visible real;
+     los navegadores que no lo soportan ignoran esta línea y se quedan con
+     el 100vh de arriba. */
+  min-height: 100dvh;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -110,6 +117,9 @@ body {
 
 .app-shell {
   min-height: 100vh;
+  /* Ver el mismo comentario en .auth-screen: sin esto, en mobile queda una
+     franja negra (el body de atrás) debajo del gradiente. */
+  min-height: 100dvh;
   display: flex;
 }
 
@@ -812,7 +822,12 @@ body {
 @media (max-width: 720px) {
   .app-shell {
     flex-direction: column;
-    min-height: 0;
+    /* Sigue cubriendo toda la pantalla (como en desktop), solo que
+       apilado en columna en vez de en fila — si esto queda en 0/auto y
+       el contenido es corto (pocas transacciones), se ve el negro del
+       body debajo del gradiente. */
+    min-height: 100vh;
+    min-height: 100dvh;
   }
 
   .sidebar,
