@@ -6,17 +6,6 @@ import { extractAndCategorize, NEW_CATEGORY_CONFIDENCE_THRESHOLD } from './categ
 type Admin = ReturnType<typeof supabaseAdmin>
 type Connection = { user_id: string; refresh_token: string; last_scanned_at: string | null }
 
-function sleep(ms: number) {
-  return new Promise((resolve) => setTimeout(resolve, ms))
-}
-
-// Los free tiers de LLM (Vercel AI Gateway, y también el de Gemini vía API
-// key propia) limitan requests por minuto. Este loop llama al LLM una vez (a
-// veces dos, si hace falta investigar el comercio) por cada mail — sin este
-// respiro entre llamadas, un usuario con varios mails en la ventana de
-// escaneo se comía un 429 a mitad de la corrida.
-const LLM_CALL_DELAY_MS = 3000
-
 // Compartido entre el cron (recorre todas las conexiones) y el endpoint
 // manual /api/gmail/scan (una sola, la del usuario logueado) — ver
 // api/cron/scan-gmail.ts y api/gmail/scan.ts.
@@ -51,14 +40,10 @@ export async function scanGmailForUser(admin: Admin, conn: Connection): Promise<
   const otrosCategory = categories.find((c) => c.name.toLowerCase() === 'otros')
 
   let inserted = 0
-  let isFirstLlmCall = true
 
   for (const messageId of messageIds) {
     const text = await getMessagePlainText(accessToken, messageId)
     if (!text) continue
-
-    if (!isFirstLlmCall) await sleep(LLM_CALL_DELAY_MS)
-    isFirstLlmCall = false
 
     const extracted = await extractAndCategorize(
       text,
