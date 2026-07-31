@@ -7,6 +7,7 @@ import AuthCallback from './pages/AuthCallback'
 import Transactions from './pages/Transactions'
 import Budgets from './pages/Budgets'
 import Investments from './pages/Investments'
+import Settings from './pages/Settings'
 
 export default function App() {
   return (
@@ -25,6 +26,7 @@ export default function App() {
           <Route index element={<Transactions />} />
           <Route path="budgets" element={<Budgets />} />
           <Route path="investments" element={<Investments />} />
+          <Route path="settings" element={<Settings />} />
         </Route>
       </Routes>
     </AuthProvider>
