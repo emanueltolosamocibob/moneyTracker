@@ -309,6 +309,21 @@ export default function Transactions() {
         tx.id === t.id ? { ...tx, category_id: newCategoryId || null, needs_review: !newCategoryId } : tx,
       ),
     )
+
+    // Misma normalización que api/_lib/parseEmailTemplate.ts (trim +
+    // mayúsculas + espacios colapsados) — una corrección manual acá
+    // alimenta la misma caché comercio->categoría que usa el scan de Gmail,
+    // así que el próximo mail de este comercio ya sale bien categorizado
+    // sin gastar Gemini.
+    if (t.merchant && newCategoryId && user) {
+      const merchantKey = t.merchant.trim().toUpperCase().replace(/\s+/g, ' ')
+      await supabase
+        .from('merchant_categories')
+        .upsert(
+          { user_id: user.id, merchant_key: merchantKey, category_id: newCategoryId, updated_at: new Date().toISOString() },
+          { onConflict: 'user_id,merchant_key' },
+        )
+    }
   }
 
   async function deleteTransaction(t: Transaction) {
