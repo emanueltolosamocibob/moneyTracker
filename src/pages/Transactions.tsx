@@ -309,7 +309,7 @@ export default function Transactions() {
               value={categoryId}
               onChange={setCategoryId}
               placeholder="Sin categoría"
-              options={categories.map((c) => ({ value: c.id, label: c.name, icon: getCategoryIcon(c.name) }))}
+              options={categories.map((c) => ({ value: c.id, label: c.name, icon: getCategoryIcon(c.name, c.icon) }))}
               onCreate={handleCreateCategory}
               createLabel="Agregar categoría"
             />
@@ -388,7 +388,7 @@ export default function Transactions() {
                     <td className="tx-category">
                       {cat ? (
                         <span className="tx-category-inner">
-                          {getCategoryIcon(cat.name)} {cat.name}
+                          {getCategoryIcon(cat.name, cat.icon)} {cat.name}
                         </span>
                       ) : (
                         '—'

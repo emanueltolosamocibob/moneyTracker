@@ -703,6 +703,7 @@ body {
   text-align: right;
 }
 
+.tx-edit-btn,
 .tx-delete-btn {
   display: inline-flex;
   align-items: center;
@@ -713,11 +714,48 @@ body {
   border-radius: var(--radius);
   padding: 0.3rem;
   cursor: pointer;
+  margin-left: 0.4rem;
 }
 
+.tx-edit-btn:hover,
 .tx-delete-btn:hover {
   background: rgba(255, 255, 255, 0.18);
   color: white;
+}
+
+/* Mismo layout vertical que .budget-form (formulario dentro de un Modal,
+   en vez del layout de fila usado por .tx-form en la barra de arriba). */
+.tx-edit-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  width: 100%;
+  max-width: 420px;
+}
+
+/* .tx-field trae `flex: 1 1 160px` pensado para .tx-form (fila horizontal),
+   donde ese flex-basis fija un *ancho*. Acá .tx-edit-form es columna, así
+   que ese mismo flex-basis se reinterpreta como *alto* y el campo se estira
+   a ocupar casi todo el modal — mismo pitfall que documenta CLAUDE.md, hay
+   que resetearlo explícitamente en este contexto. */
+.tx-edit-form > .tx-field {
+  flex: 0 0 auto;
+}
+
+.tx-edit-form > input,
+.tx-edit-form > .tx-field input {
+  width: 100%;
+  padding: 0.5rem;
+  border-radius: var(--radius);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.08);
+  color: white;
+  font-family: inherit;
+  font-size: 1rem;
+}
+
+.tx-edit-form input::placeholder {
+  color: rgba(255, 255, 255, 0.55);
 }
 
 /* Importante: el flex va en un <span> adentro de la celda, nunca en el
@@ -1227,6 +1265,61 @@ body {
   background: #f4f4ff;
 }
 
+/* --- Configuración: categorías + fuentes de ingreso lado a lado --- */
+
+.settings-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.5rem;
+  align-items: start;
+}
+
+.settings-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.settings-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.settings-panel-header h3 {
+  margin: 0;
+}
+
+.icon-picker {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 0.5rem;
+}
+
+.icon-picker-option {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.7);
+  border-radius: var(--radius);
+  padding: 0.55rem;
+  cursor: pointer;
+}
+
+.icon-picker-option:hover {
+  background: rgba(255, 255, 255, 0.16);
+  color: white;
+}
+
+.icon-picker-option.active {
+  background: rgba(255, 255, 255, 0.9);
+  border-color: transparent;
+  color: #1a1fb8;
+}
+
 /* Mobile: la sidebar pasa de columna lateral fija a una barra superior
    colapsable, para no comerse ancho de pantalla en un viewport angosto. */
 @media (max-width: 720px) {
@@ -1368,5 +1461,13 @@ body {
 
   .budget-grid {
     grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+  }
+
+  .settings-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .icon-picker {
+    grid-template-columns: repeat(4, 1fr);
   }
 }

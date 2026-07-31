@@ -464,7 +464,7 @@ export default function Budgets() {
                 const pct = item.amount > 0 ? (spent / item.amount) * 100 : 0
                 return (
                   <div className="budget-card" key={item.id}>
-                    <BudgetRing pct={pct} icon={getCategoryIcon(cat?.name)} />
+                    <BudgetRing pct={pct} icon={getCategoryIcon(cat?.name, cat?.icon)} />
                     <strong className="budget-card-spent">{formatCurrency(spent, 'ARS')}</strong>
                     <span className="budget-card-title">{cat?.name ?? '—'}</span>
                   </div>
@@ -517,7 +517,7 @@ export default function Budgets() {
               {categories.map((c) => (
                 <div className="budget-category-row" key={c.id}>
                   <span className="budget-category-label">
-                    {getCategoryIcon(c.name)}
+                    {getCategoryIcon(c.name, c.icon)}
                     <span>{c.name}</span>
                   </span>
                   <input
