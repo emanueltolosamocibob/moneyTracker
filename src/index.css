@@ -999,8 +999,20 @@ body {
   flex-wrap: wrap;
 }
 
+/* Ocupa toda la fila (así el modal queda: Eliminar solo arriba, Cancelar +
+   Guardar cambios juntos abajo) en vez de compartir fila con los otros dos
+   botones empujados a la derecha por margin-right: auto. */
 .modal-actions-start {
-  margin-right: auto;
+  flex: 1 0 100%;
+}
+
+/* Los dos botones que quedan en la fila de abajo (Cancelar/Guardar cambios)
+   se reparten ese ancho completo en vez de quedar angostos y alineados a la
+   derecha — el `~` los limita a modales que tienen un .modal-actions-start
+   (hoy, editar presupuesto), sin tocar los demás modal-actions de dos
+   botones de la app. */
+.modal-actions-start ~ button {
+  flex: 1;
 }
 
 .budget-empty {
