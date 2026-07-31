@@ -29,6 +29,12 @@ export default function Settings() {
   const [pendingDelete, setPendingDelete] = useState<PendingDelete | null>(null)
   const [deleting, setDeleting] = useState(false)
 
+  // Vaciar transacciones: dos pantallas de confirmación antes de borrar todo
+  // (ver openClearTransactions/confirmClearTransactions más abajo).
+  const [clearStep, setClearStep] = useState<'confirm1' | 'confirm2' | null>(null)
+  const [clearTransactionCount, setClearTransactionCount] = useState<number | null>(null)
+  const [clearing, setClearing] = useState(false)
+
   async function load() {
     setLoading(true)
     const [{ data: cats, error: catError }, { data: sources, error: sourceError }] = await Promise.all([
@@ -130,6 +136,34 @@ export default function Settings() {
     }
     setPendingDelete(null)
     load()
+  }
+
+  async function openClearTransactions() {
+    if (!user) return
+    const { count } = await supabase
+      .from('transactions')
+      .select('id', { count: 'exact', head: true })
+      .eq('user_id', user.id)
+    setClearTransactionCount(count ?? 0)
+    setClearStep('confirm1')
+  }
+
+  function closeClearTransactions() {
+    setClearStep(null)
+    setClearTransactionCount(null)
+  }
+
+  async function confirmClearTransactions() {
+    if (!user) return
+    setClearing(true)
+    const { error: deleteError } = await supabase.from('transactions').delete().eq('user_id', user.id)
+    setClearing(false)
+    if (deleteError) {
+      setError(deleteError.message)
+      closeClearTransactions()
+      return
+    }
+    closeClearTransactions()
   }
 
   return (
@@ -244,6 +278,19 @@ export default function Settings() {
         </div>
       )}
 
+      <section className="settings-panel settings-danger-zone">
+        <div className="settings-panel-header">
+          <h3>Transacciones</h3>
+        </div>
+        <p className="empty-state">
+          Elimina todas tus transacciones (manuales y las traídas de Gmail) de forma permanente. Las de Gmail no
+          vuelven a traerse solas en el próximo escaneo.
+        </p>
+        <button type="button" className="gmail-scan-btn danger" onClick={openClearTransactions}>
+          <IconTrash size={14} /> Vaciar
+        </button>
+      </section>
+
       {categoryModal && (
         <Modal>
           <h3>{categoryModal === 'new' ? 'Nueva categoría' : 'Editar categoría'}</h3>
@@ -326,6 +373,43 @@ export default function Settings() {
             </button>
             <button type="button" className="danger" onClick={confirmDelete} disabled={deleting}>
               {deleting ? 'Eliminando...' : 'Eliminar'}
+            </button>
+          </div>
+        </Modal>
+      )}
+
+      {clearStep === 'confirm1' && (
+        <Modal>
+          <h3>Vaciar transacciones</h3>
+          <p>
+            Se van a eliminar {clearTransactionCount ?? 0} transacciones (manuales y de Gmail) de forma permanente.
+            Las de Gmail no vuelven a traerse solas en el próximo escaneo — el mail queda fuera de la ventana de
+            sincronización para siempre.
+          </p>
+          <div className="modal-actions">
+            <button type="button" onClick={closeClearTransactions}>
+              Cancelar
+            </button>
+            <button type="button" className="primary" onClick={() => setClearStep('confirm2')}>
+              Continuar
+            </button>
+          </div>
+        </Modal>
+      )}
+
+      {clearStep === 'confirm2' && (
+        <Modal>
+          <h3>¿Confirmás definitivamente?</h3>
+          <p>
+            Esta acción no se puede deshacer. Se van a eliminar las {clearTransactionCount ?? 0} transacciones de tu
+            cuenta ahora mismo.
+          </p>
+          <div className="modal-actions">
+            <button type="button" onClick={closeClearTransactions}>
+              Cancelar
+            </button>
+            <button type="button" className="danger" onClick={confirmClearTransactions} disabled={clearing}>
+              <IconTrash size={14} /> {clearing ? 'Vaciando...' : 'Vaciar'}
             </button>
           </div>
         </Modal>
