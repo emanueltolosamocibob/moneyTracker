@@ -94,6 +94,7 @@ export default function Transactions() {
   const [type, setType] = useState<TransactionType>('expense')
   const [saving, setSaving] = useState(false)
   const [scanning, setScanning] = useState(false)
+  const [scanResult, setScanResult] = useState<string | null>(null)
   const [amountError, setAmountError] = useState<string | null>(null)
 
   const [page, setPage] = useState(0)
@@ -290,6 +291,7 @@ export default function Transactions() {
   async function handleScanGmail() {
     setScanning(true)
     setError(null)
+    setScanResult(null)
     try {
       const { data } = await supabase.auth.getSession()
       const res = await fetch('/api/gmail/scan', {
@@ -298,6 +300,7 @@ export default function Transactions() {
       })
       const json = await res.json()
       if (!res.ok) throw new Error(json.error ?? 'No se pudo escanear Gmail')
+      setScanResult(json.result ?? null)
       await load()
     } catch (err) {
       setError((err as Error).message)
@@ -411,6 +414,7 @@ export default function Transactions() {
       </form>
 
       {error && <p className="error">{error}</p>}
+      {scanResult && <p className="empty-state">{scanResult}</p>}
       {loading ? (
         <p>Cargando...</p>
       ) : transactions.length === 0 ? (
