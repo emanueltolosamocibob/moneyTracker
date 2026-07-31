@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { supabase } from '../lib/supabaseClient'
 import { useAuth } from '../lib/AuthContext'
 import type { Category, IncomeSource, PaymentMethod, Transaction, TransactionType } from '../types/database'
-import { IconChevronDown, IconPlus, IconRefresh, IconX } from '../components/icons'
+import { IconChevronDown, IconPencil, IconPlus, IconRefresh, IconX } from '../components/icons'
 import Select from '../components/Select'
 import Modal from '../components/Modal'
 import { getCategoryIcon } from '../lib/categoryIcons'
@@ -47,6 +47,10 @@ function formatAmountDigits(digits: string) {
   return formatCurrency(centsToNumber(digits), 'ARS')
 }
 
+function numberToCentsDigits(amount: number) {
+  return Math.round(amount * 100).toString()
+}
+
 function todayDateInput() {
   return new Date().toISOString().slice(0, 10)
 }
@@ -59,6 +63,17 @@ function todayDateInput() {
 function dateInputToISO(dateStr: string) {
   const [y, m, d] = dateStr.split('-').map(Number)
   return new Date(y, m - 1, d).toISOString()
+}
+
+// Inversa de dateInputToISO: toma la fecha guardada (occurred_at) y la
+// vuelve a un <input type="date"> usando el calendario local, por la misma
+// razón (evitar que el día se corra por el desfasaje UTC/Argentina).
+function isoToDateInput(iso: string) {
+  const d = new Date(iso)
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
 }
 
 export default function Transactions() {
@@ -89,7 +104,21 @@ export default function Transactions() {
   // Transacción de Gmail pendiente de confirmar borrado (ver handleDeleteTransaction).
   const [pendingDelete, setPendingDelete] = useState<Transaction | null>(null)
 
+  // Transacción abierta en el modal de edición (ver openEdit/handleEditSubmit).
+  const [editingTx, setEditingTx] = useState<Transaction | null>(null)
+  const [editAmountDigits, setEditAmountDigits] = useState('')
+  const [editOccurredAt, setEditOccurredAt] = useState('')
+  const [editMerchant, setEditMerchant] = useState('')
+  const [editCategoryId, setEditCategoryId] = useState('')
+  const [editIncomeSourceId, setEditIncomeSourceId] = useState('')
+  const [editPaymentMethod, setEditPaymentMethod] = useState<PaymentMethod | ''>('')
+  const [editCardLast4, setEditCardLast4] = useState('')
+  const [editType, setEditType] = useState<TransactionType>('expense')
+  const [editSaving, setEditSaving] = useState(false)
+  const [editAmountError, setEditAmountError] = useState<string | null>(null)
+
   const isCardPayment = paymentMethod === 'credit_card' || paymentMethod === 'debit_card'
+  const isEditCardPayment = editPaymentMethod === 'credit_card' || editPaymentMethod === 'debit_card'
 
   async function load() {
     setLoading(true)
@@ -220,6 +249,52 @@ export default function Transactions() {
       return
     }
     setTransactions((prev) => prev.filter((tx) => tx.id !== t.id))
+  }
+
+  function openEdit(t: Transaction) {
+    setEditingTx(t)
+    setEditAmountDigits(numberToCentsDigits(t.amount))
+    setEditOccurredAt(isoToDateInput(t.occurred_at))
+    setEditMerchant(t.merchant ?? '')
+    setEditCategoryId(t.category_id ?? '')
+    setEditIncomeSourceId(t.income_source_id ?? '')
+    setEditPaymentMethod(t.payment_method ?? '')
+    setEditCardLast4(t.card_last4 ?? '')
+    setEditType(t.type)
+    setEditAmountError(null)
+  }
+
+  async function handleEditSubmit(e: FormEvent) {
+    e.preventDefault()
+    setEditAmountError(null)
+    if (!editAmountDigits) {
+      setEditAmountError('Rellená este campo.')
+      return
+    }
+    if (!editingTx) return
+    setEditSaving(true)
+    const isIncome = editType === 'income'
+    const { error: updateError } = await supabase
+      .from('transactions')
+      .update({
+        amount: centsToNumber(editAmountDigits),
+        merchant: isIncome ? null : editMerchant || null,
+        category_id: isIncome ? null : editCategoryId || null,
+        income_source_id: isIncome ? editIncomeSourceId || null : null,
+        occurred_at: dateInputToISO(editOccurredAt),
+        type: editType,
+        needs_review: isIncome ? !editIncomeSourceId : !editCategoryId,
+        payment_method: isIncome ? null : editPaymentMethod || null,
+        card_last4: !isIncome && isEditCardPayment && editCardLast4 ? editCardLast4 : null,
+      })
+      .eq('id', editingTx.id)
+    setEditSaving(false)
+    if (updateError) {
+      setError(updateError.message)
+      return
+    }
+    setEditingTx(null)
+    load()
   }
 
   async function handleScanGmail() {
@@ -404,6 +479,14 @@ export default function Transactions() {
                     <td className="tx-actions">
                       <button
                         type="button"
+                        className="tx-edit-btn"
+                        aria-label="Editar transacción"
+                        onClick={() => openEdit(t)}
+                      >
+                        <IconPencil size={14} />
+                      </button>
+                      <button
+                        type="button"
                         className="tx-delete-btn"
                         aria-label="Eliminar transacción"
                         onClick={() => handleDeleteTransaction(t)}
@@ -472,6 +555,99 @@ export default function Transactions() {
             )}
           </div>
         </>
+      )}
+
+      {editingTx && (
+        <Modal>
+          <h3>Editar transacción</h3>
+          <form className="tx-edit-form" onSubmit={handleEditSubmit} noValidate>
+            <div className="type-toggle" role="group" aria-label="Tipo de movimiento">
+              <button
+                type="button"
+                className={editType === 'expense' ? 'active' : ''}
+                onClick={() => setEditType('expense')}
+              >
+                Egreso
+              </button>
+              <button
+                type="button"
+                className={editType === 'income' ? 'active income' : ''}
+                onClick={() => setEditType('income')}
+              >
+                Ingreso
+              </button>
+            </div>
+            <input type="date" value={editOccurredAt} onChange={(e) => setEditOccurredAt(e.target.value)} />
+            <div className="tx-field">
+              <input
+                type="text"
+                inputMode="numeric"
+                className="amount-input"
+                placeholder="Monto"
+                value={formatAmountDigits(editAmountDigits)}
+                onChange={(e) => {
+                  setEditAmountDigits(e.target.value.replace(/\D/g, '').slice(0, 12))
+                  if (editAmountError) setEditAmountError(null)
+                }}
+              />
+              {editAmountError && <span className="field-error">{editAmountError}</span>}
+            </div>
+            {editType === 'income' ? (
+              <Select
+                value={editIncomeSourceId}
+                onChange={setEditIncomeSourceId}
+                placeholder="Fuente de ingreso"
+                options={incomeSources.map((s) => ({ value: s.id, label: s.name }))}
+                onCreate={handleCreateIncomeSource}
+                createLabel="Agregar fuente"
+              />
+            ) : (
+              <>
+                <input
+                  type="text"
+                  placeholder="Comercio"
+                  value={editMerchant}
+                  onChange={(e) => setEditMerchant(e.target.value)}
+                />
+                <Select
+                  value={editCategoryId}
+                  onChange={setEditCategoryId}
+                  placeholder="Sin categoría"
+                  options={categories.map((c) => ({ value: c.id, label: c.name, icon: getCategoryIcon(c.name) }))}
+                  onCreate={handleCreateCategory}
+                  createLabel="Agregar categoría"
+                />
+                <Select
+                  value={editPaymentMethod}
+                  onChange={(v) => setEditPaymentMethod(v as PaymentMethod | '')}
+                  placeholder="Medio de pago"
+                  options={(Object.keys(PAYMENT_METHOD_LABELS) as PaymentMethod[]).map((pm) => ({
+                    value: pm,
+                    label: PAYMENT_METHOD_LABELS[pm],
+                  }))}
+                />
+                {isEditCardPayment && (
+                  <input
+                    type="text"
+                    placeholder="Últimos 4 dígitos"
+                    maxLength={4}
+                    pattern="[0-9]{4}"
+                    value={editCardLast4}
+                    onChange={(e) => setEditCardLast4(e.target.value.replace(/\D/g, '').slice(0, 4))}
+                  />
+                )}
+              </>
+            )}
+            <div className="modal-actions">
+              <button type="button" onClick={() => setEditingTx(null)}>
+                Cancelar
+              </button>
+              <button type="submit" className="primary" disabled={editSaving}>
+                {editSaving ? 'Guardando...' : 'Guardar cambios'}
+              </button>
+            </div>
+          </form>
+        </Modal>
       )}
 
       {pendingDelete && (
