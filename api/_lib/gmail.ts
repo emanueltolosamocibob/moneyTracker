@@ -19,12 +19,29 @@ export async function refreshAccessToken(refreshToken: string): Promise<string> 
   return data.access_token
 }
 
+// Gmail devuelve los mensajes más recientes primero y nunca más de
+// maxResults por página — sin paginar acá, una cuenta con más de un puñado
+// de mails matcheados en la ventana del scan pierde silenciosamente todo lo
+// que quede más atrás que la primera página (efecto indistinguible de una
+// ventana de fechas más corta, aunque `since` esté bien calculado).
 export async function listMessageIds(accessToken: string, query: string): Promise<string[]> {
-  const url = `${GMAIL_API_BASE}/messages?${new URLSearchParams({ q: query, maxResults: '25' })}`
-  const res = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}` } })
-  if (!res.ok) throw new Error(`Gmail list failed: ${res.status} ${await res.text()}`)
-  const data = (await res.json()) as { messages?: { id: string }[] }
-  return (data.messages ?? []).map((m) => m.id)
+  const ids: string[] = []
+  let pageToken: string | undefined
+
+  do {
+    const params: Record<string, string> = { q: query, maxResults: '500' }
+    if (pageToken) params.pageToken = pageToken
+
+    const url = `${GMAIL_API_BASE}/messages?${new URLSearchParams(params)}`
+    const res = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}` } })
+    if (!res.ok) throw new Error(`Gmail list failed: ${res.status} ${await res.text()}`)
+    const data = (await res.json()) as { messages?: { id: string }[]; nextPageToken?: string }
+
+    ids.push(...(data.messages ?? []).map((m) => m.id))
+    pageToken = data.nextPageToken
+  } while (pageToken)
+
+  return ids
 }
 
 export async function getMessagePlainText(accessToken: string, messageId: string): Promise<string> {
