@@ -13,7 +13,17 @@ export interface GmailScanResult {
   notPayment: number
   conflicts: number
   realErrors: number
+  hasMore: boolean
 }
+
+// Vercel corta la función a los 300s, y un mail ambiguo puede disparar
+// ráfagas de varias llamadas a Gemini casi juntas (ver researchMerchant en
+// categorize.ts) que se comen la cuota de golpe aunque estén espaciadas
+// entre mails. Procesar de a poco por invocación — y que el llamador
+// (api/gmail/scan.ts) repita mientras haya `hasMore` — mantiene cada
+// request corta y acota el daño de una falla de cuota a un puñado de mails
+// en vez de perder el progreso de todo un mes.
+const BATCH_SIZE = 5
 
 // Compartido entre el cron (recorre todas las conexiones) y el endpoint
 // manual /api/gmail/scan (una sola, la del usuario logueado) — ver
@@ -55,6 +65,11 @@ export async function scanGmailForUser(admin: Admin, conn: Connection): Promise<
     alreadyProcessedIds = new Set((alreadyProcessed ?? []).map((t) => t.source_email_id))
   }
 
+  const pendingIds = messageIds.filter((id) => !alreadyProcessedIds.has(id))
+  const batch = pendingIds.slice(0, BATCH_SIZE)
+  const hasMore = pendingIds.length > batch.length
+  const conflictsFromDedup = messageIds.length - pendingIds.length
+
   const { data: existingCategories } = await admin
     .from('categories')
     .select('id, name')
@@ -70,15 +85,10 @@ export async function scanGmailForUser(admin: Admin, conn: Connection): Promise<
   let inserted = 0
   let noText = 0
   let notPayment = 0
-  let conflicts = 0
+  let conflicts = conflictsFromDedup
   let realErrors = 0
 
-  for (const messageId of messageIds) {
-    if (alreadyProcessedIds.has(messageId)) {
-      conflicts += 1
-      continue
-    }
-
+  for (const messageId of batch) {
     const text = await getMessagePlainText(accessToken, messageId)
     if (!text) {
       noText += 1
@@ -154,10 +164,16 @@ export async function scanGmailForUser(admin: Admin, conn: Connection): Promise<
     }
   }
 
-  await admin
-    .from('gmail_connections')
-    .update({ last_scanned_at: new Date().toISOString() })
-    .eq('user_id', conn.user_id)
+  // Solo avanza el checkpoint cuando esta tanda cubrió todo lo pendiente de
+  // la ventana — si hasMore, la próxima invocación tiene que volver a mirar
+  // el mismo `since` (los ya procesados se saltan por el chequeo de arriba,
+  // sin gastar LLM en ellos de nuevo).
+  if (!hasMore) {
+    await admin
+      .from('gmail_connections')
+      .update({ last_scanned_at: new Date().toISOString() })
+      .eq('user_id', conn.user_id)
+  }
 
   const result: GmailScanResult = {
     matched: messageIds.length,
@@ -166,9 +182,10 @@ export async function scanGmailForUser(admin: Admin, conn: Connection): Promise<
     notPayment,
     conflicts,
     realErrors,
+    hasMore,
   }
   console.log(
-    `[gmail-scan] user=${conn.user_id} ok: ${inserted}/${messageIds.length} nuevas (sin_texto=${noText} no_es_pago=${notPayment} ya_procesado=${conflicts} error=${realErrors})`,
+    `[gmail-scan] user=${conn.user_id} ok: ${inserted}/${batch.length} nuevas en esta tanda (${pendingIds.length - batch.length} pendientes, sin_texto=${noText} no_es_pago=${notPayment} ya_procesado=${conflicts} error=${realErrors} hasMore=${hasMore})`,
   )
   return result
 }
