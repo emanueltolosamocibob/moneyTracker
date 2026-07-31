@@ -1,6 +1,6 @@
 import { supabaseAdmin } from './supabaseAdmin.js'
 import { buildGmailQuery } from './bankSenders.js'
-import { refreshAccessToken, listMessageIds, getMessagePlainText } from './gmail.js'
+import { refreshAccessToken, listMessageIds, getMessageContent } from './gmail.js'
 import { extractAndCategorize, NEW_CATEGORY_CONFIDENCE_THRESHOLD } from './categorize.js'
 
 type Admin = ReturnType<typeof supabaseAdmin>
@@ -89,7 +89,7 @@ export async function scanGmailForUser(admin: Admin, conn: Connection): Promise<
   let realErrors = 0
 
   for (const messageId of batch) {
-    const text = await getMessagePlainText(accessToken, messageId)
+    const { text, receivedAt } = await getMessageContent(accessToken, messageId)
     if (!text) {
       noText += 1
       continue
@@ -137,7 +137,13 @@ export async function scanGmailForUser(admin: Admin, conn: Connection): Promise<
       amount: extracted.amount,
       currency: extracted.currency ?? 'ARS',
       merchant: extracted.merchant,
-      occurred_at: extracted.occurred_at ?? new Date().toISOString(),
+      // Preferimos la fecha que el LLM parseó del cuerpo del mail (más
+      // precisa, puede incluir la hora exacta), pero si vino null caemos en
+      // la fecha en que Gmail recibió el aviso — no en "ahora". El aviso del
+      // banco se manda al instante de la operación, así que es un piso
+      // mucho más confiable; con "ahora" una transacción de hace semanas
+      // terminaba figurando como la más reciente de la tabla.
+      occurred_at: extracted.occurred_at ?? receivedAt,
       type: extracted.type ?? 'expense',
       source: 'gmail',
       source_email_id: messageId,

@@ -44,12 +44,26 @@ export async function listMessageIds(accessToken: string, query: string): Promis
   return ids
 }
 
-export async function getMessagePlainText(accessToken: string, messageId: string): Promise<string> {
+export interface GmailMessageContent {
+  text: string
+  // Cuándo Gmail recibió el mail (epoch ms como string, el campo
+  // `internalDate` de la API) convertido a ISO — el aviso del banco se manda
+  // prácticamente al instante de la operación, así que esto es un piso
+  // confiable para occurred_at cuando el LLM no logra parsear una fecha del
+  // cuerpo del mail. Mucho mejor que caer en "ahora": eso hacía que
+  // transacciones de hace semanas aparecieran arriba de todo, ordenadas como
+  // si fueran de hoy.
+  receivedAt: string
+}
+
+export async function getMessageContent(accessToken: string, messageId: string): Promise<GmailMessageContent> {
   const url = `${GMAIL_API_BASE}/messages/${messageId}?format=full`
   const res = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}` } })
   if (!res.ok) throw new Error(`Gmail get failed: ${res.status} ${await res.text()}`)
   const data = await res.json()
-  return extractPlainText(data.payload) || data.snippet || ''
+  const text = extractPlainText(data.payload) || data.snippet || ''
+  const receivedAt = data.internalDate ? new Date(Number(data.internalDate)).toISOString() : new Date().toISOString()
+  return { text, receivedAt }
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
