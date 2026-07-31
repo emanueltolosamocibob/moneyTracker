@@ -520,6 +520,33 @@ body {
   backdrop-filter: blur(10px);
   color: white;
   box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35);
+  /* Sin esto, una lista larga (ej. categorías) simplemente se sigue
+     dibujando más allá del viewport/modal — nada tiene overflow:auto, así
+     que no hay forma de scrollear para llegar a las opciones de abajo.
+     Mismo recipe de scrollbar fina que .tx-table-scroll/.budget-category-list. */
+  max-height: 240px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.35) rgba(255, 255, 255, 0.08);
+}
+
+.select-panel::-webkit-scrollbar {
+  width: 8px;
+}
+
+.select-panel::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 4px;
+}
+
+.select-panel::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.35);
+  border-radius: 4px;
+}
+
+.select-panel::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.55);
 }
 
 .select-panel li {
