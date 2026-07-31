@@ -6,10 +6,19 @@ import { extractAndCategorize, NEW_CATEGORY_CONFIDENCE_THRESHOLD } from './categ
 type Admin = ReturnType<typeof supabaseAdmin>
 type Connection = { user_id: string; refresh_token: string; last_scanned_at: string | null }
 
+export interface GmailScanResult {
+  matched: number
+  inserted: number
+  noText: number
+  notPayment: number
+  conflicts: number
+  realErrors: number
+}
+
 // Compartido entre el cron (recorre todas las conexiones) y el endpoint
 // manual /api/gmail/scan (una sola, la del usuario logueado) — ver
 // api/cron/scan-gmail.ts y api/gmail/scan.ts.
-export async function scanGmailForUser(admin: Admin, conn: Connection): Promise<string> {
+export async function scanGmailForUser(admin: Admin, conn: Connection): Promise<GmailScanResult> {
   const accessToken = await refreshAccessToken(conn.refresh_token)
 
   // Nunca busca más atrás que el 1° del mes actual (aunque last_scanned_at
@@ -150,7 +159,16 @@ export async function scanGmailForUser(admin: Admin, conn: Connection): Promise<
     .update({ last_scanned_at: new Date().toISOString() })
     .eq('user_id', conn.user_id)
 
-  const summary = `ok: ${inserted}/${messageIds.length} nuevas (sin_texto=${noText} no_es_pago=${notPayment} ya_procesado=${conflicts} error=${realErrors})`
-  console.log(`[gmail-scan] user=${conn.user_id} ${summary}`)
-  return summary
+  const result: GmailScanResult = {
+    matched: messageIds.length,
+    inserted,
+    noText,
+    notPayment,
+    conflicts,
+    realErrors,
+  }
+  console.log(
+    `[gmail-scan] user=${conn.user_id} ok: ${inserted}/${messageIds.length} nuevas (sin_texto=${noText} no_es_pago=${notPayment} ya_procesado=${conflicts} error=${realErrors})`,
+  )
+  return result
 }
