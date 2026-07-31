@@ -207,7 +207,6 @@ body {
   border-radius: var(--radius);
   background: rgba(255, 255, 255, 0.06);
   border: 1px solid rgba(255, 255, 255, 0.12);
-  font-weight: 600;
 }
 
 .nav-btn svg {
@@ -878,6 +877,64 @@ body {
 .tx-pagination-nav button:disabled {
   opacity: 0.4;
   cursor: default;
+}
+
+/* --- Controles arriba de la tabla: navegación de mes, filtro de
+   categoría y contador --- */
+.tx-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.tx-month-nav {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-weight: 600;
+}
+
+.tx-month-nav button {
+  padding: 0.3rem 0.6rem;
+  border-radius: var(--radius);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.06);
+  color: white;
+  font-family: inherit;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+.tx-month-nav button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.tx-controls-right {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.tx-controls-right .select-trigger {
+  min-width: 160px;
+}
+
+.tx-counter {
+  color: rgba(255, 255, 255, 0.65);
+  font-size: 0.85rem;
+  white-space: nowrap;
+}
+
+/* El Select de categoría inline en la tabla (ver .tx-category) es más
+   angosto que el de arriba — alcanza con que el nombre de la categoría no
+   quede apretado, no necesita el mismo ancho mínimo. */
+.tx-category .select-trigger {
+  min-width: 130px;
 }
 
 .tx-summary {
