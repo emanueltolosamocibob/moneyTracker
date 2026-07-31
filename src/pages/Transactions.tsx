@@ -598,7 +598,7 @@ export default function Transactions() {
                 <th>Comercio</th>
                 <th>Categoría</th>
                 <th>Medio de pago</th>
-                <th>Monto</th>
+                <th className="tx-amount-header">Monto</th>
                 <th></th>
               </tr>
             </thead>
