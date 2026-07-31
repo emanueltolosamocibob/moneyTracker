@@ -363,15 +363,45 @@ body {
   cursor: default;
 }
 
+/* El acordeón de "+ Nueva transacción" era mobile-only — ahora también
+   colapsa en desktop, para no tener el form abierto todo el tiempo arriba
+   de la tabla. La diferencia entre breakpoints queda en cómo se ve *abierto*
+   (fila horizontal acá, apilado en columna en el media query de mobile más
+   abajo), no en si arranca colapsado. */
 .tx-form-toggle {
-  display: none;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  margin-bottom: 1rem;
+  padding: 0.6rem 0.85rem;
+  border-radius: var(--radius);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.08);
+  color: white;
+  font-family: inherit;
+  font-size: 0.95rem;
+  cursor: pointer;
+}
+
+.tx-form-toggle svg:last-child {
+  margin-left: auto;
+  transition: transform 0.2s ease;
+}
+
+.tx-form-toggle.open svg:last-child {
+  transform: rotate(180deg);
 }
 
 .tx-form {
-  display: flex;
+  display: none;
   gap: 0.5rem;
   margin-bottom: 1.5rem;
   flex-wrap: wrap;
+}
+
+.tx-form.open {
+  display: flex;
 }
 
 /* `>` a propósito: esto fija el *ancho* de los hijos directos del form (eje
@@ -839,6 +869,11 @@ body {
   color: var(--danger);
 }
 
+.tx-table td.tx-amount,
+.tx-table th.tx-amount-header {
+  text-align: right;
+}
+
 .tx-pagination {
   display: flex;
   align-items: center;
@@ -943,6 +978,7 @@ body {
   justify-content: flex-end;
   gap: 1.5rem 2rem;
   margin-top: 1rem;
+  margin-bottom: 2rem;
   padding-top: 1rem;
   border-top: 1px solid rgba(255, 255, 255, 0.14);
 }
@@ -951,16 +987,16 @@ body {
   display: flex;
   flex-direction: column;
   align-items: flex-end;
-  gap: 0.2rem;
+  gap: 0.3rem;
 }
 
 .tx-summary span {
   color: rgba(255, 255, 255, 0.65);
-  font-size: 0.8rem;
+  font-size: 0.9rem;
 }
 
 .tx-summary .tx-amount {
-  font-size: 1.1rem;
+  font-size: 2.2rem;
 }
 
 .empty-state {
@@ -1523,42 +1559,12 @@ body {
 
   /* Formulario de nueva transacción: en fila con flex-wrap quedaba en una
      grilla de 2 columnas desprolija en un viewport angosto — apilado a
-     ancho completo es más cómodo para tocar. Además, arranca colapsado
-     detrás de un botón para no comerse espacio antes de la lista. */
-  .tx-form-toggle {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    width: 100%;
-    margin-bottom: 1rem;
-    padding: 0.6rem 0.85rem;
-    border-radius: var(--radius);
-    border: 1px solid rgba(255, 255, 255, 0.2);
-    background: rgba(255, 255, 255, 0.08);
-    color: white;
-    font-family: inherit;
-    font-size: 0.95rem;
-    font-weight: 600;
-    cursor: pointer;
-  }
-
-  .tx-form-toggle svg:last-child {
-    margin-left: auto;
-    transition: transform 0.2s ease;
-  }
-
-  .tx-form-toggle.open svg:last-child {
-    transform: rotate(180deg);
-  }
-
-  .tx-form {
-    display: none;
+     ancho completo es más cómodo para tocar (el acordeón en sí, arrancar
+     colapsado, ya es la base para todos los tamaños — ver .tx-form-toggle
+     más arriba). */
+  .tx-form.open {
     flex-direction: column;
     align-items: stretch;
-  }
-
-  .tx-form.open {
-    display: flex;
   }
 
   .tx-form > input,
@@ -1581,16 +1587,6 @@ body {
 
   .tx-pagination {
     justify-content: flex-end;
-  }
-
-  .tx-summary-net span {
-    font-size: 0.9rem;
-    font-weight: 600;
-    color: rgba(255, 255, 255, 0.85);
-  }
-
-  .tx-summary-net .tx-amount {
-    font-size: 1.6rem;
   }
 
   .budget-summary {
