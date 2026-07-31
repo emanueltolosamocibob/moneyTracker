@@ -129,6 +129,34 @@ export async function scanGmailForUser(admin: Admin, conn: Connection): Promise<
       categoryId = otrosCategory?.id ?? null
     }
 
+    // Transferencias entre las propias cuentas del usuario, no un
+    // ingreso/gasto real: el patrón observado es un "comercio" que en
+    // realidad es un CUIT/CUIL (11 dígitos, sin nombre real detectable),
+    // categorizado como Otros, por transferencia, y por un monto grande —
+    // se recategoriza a "Interno" para que Transactions.tsx lo excluya de
+    // los totales de ingresos/egresos.
+    const isElevenDigitMerchant = extracted.merchant ? /^\d{11}$/.test(extracted.merchant.trim()) : false
+    const looksInternal =
+      categoryId === otrosCategory?.id &&
+      extracted.payment_method === 'transfer' &&
+      isElevenDigitMerchant &&
+      extracted.amount > 400_000
+    if (looksInternal) {
+      let internalCategory = categories.find((c) => c.name.toLowerCase() === 'interno')
+      if (!internalCategory) {
+        const { data: created } = await admin
+          .from('categories')
+          .insert({ user_id: conn.user_id, name: 'Interno', is_default: false })
+          .select('id, name')
+          .single()
+        if (created) {
+          categories.push(created)
+          internalCategory = created
+        }
+      }
+      if (internalCategory) categoryId = internalCategory.id
+    }
+
     const needsReview = extracted.confidence < 0.6 || !categoryId
 
     const { error: insertError } = await admin.from('transactions').insert({
