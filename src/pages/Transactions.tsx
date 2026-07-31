@@ -97,6 +97,10 @@ export default function Transactions() {
   // Cantidad de transacciones nuevas insertadas en el último scan (null =
   // no se mostró el diálogo de resultado todavía, o ya se cerró).
   const [scanInsertedCount, setScanInsertedCount] = useState<number | null>(null)
+  // Total acumulado mientras el scan sigue en tandas (ver handleScanGmail) —
+  // se muestra en el modal de "Sincronizando..." para no dar la sensación de
+  // que se colgó en un catch-up largo.
+  const [scanProgress, setScanProgress] = useState<number | null>(null)
   const [amountError, setAmountError] = useState<string | null>(null)
 
   const [page, setPage] = useState(0)
@@ -293,20 +297,37 @@ export default function Transactions() {
   async function handleScanGmail() {
     setScanning(true)
     setError(null)
+    setScanProgress(0)
+    let totalInserted = 0
     try {
       const { data } = await supabase.auth.getSession()
-      const res = await fetch('/api/gmail/scan', {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${data.session?.access_token}` },
-      })
-      const json = await res.json()
-      if (!res.ok) throw new Error(json.error ?? 'No se pudo escanear Gmail')
-      setScanInsertedCount(json.result?.inserted ?? 0)
+      const token = data.session?.access_token
+      // El backend procesa de a tandas chicas (ver BATCH_SIZE en
+      // scanGmailForUser.ts) para no pasarse del timeout de la función ni
+      // ráfagar la cuota de Gemini en un catch-up grande — acá repetimos la
+      // llamada mientras el servidor diga que queda más por procesar en la
+      // ventana actual.
+      let hasMore = true
+      let safety = 0
+      while (hasMore && safety < 100) {
+        safety += 1
+        const res = await fetch('/api/gmail/scan', {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}` },
+        })
+        const json = await res.json()
+        if (!res.ok) throw new Error(json.error ?? 'No se pudo escanear Gmail')
+        totalInserted += json.result?.inserted ?? 0
+        hasMore = json.result?.hasMore ?? false
+        setScanProgress(totalInserted)
+      }
+      setScanInsertedCount(totalInserted)
       await load()
     } catch (err) {
       setError((err as Error).message)
     } finally {
       setScanning(false)
+      setScanProgress(null)
     }
   }
 
@@ -667,7 +688,10 @@ export default function Transactions() {
         <Modal>
           <div className="modal-panel-sync">
             <IconRefresh size={28} />
-            <p>Sincronizando con Gmail...</p>
+            <p>
+              Sincronizando con Gmail...
+              {!!scanProgress && <><br />{scanProgress} nuevas hasta ahora</>}
+            </p>
           </div>
         </Modal>
       )}

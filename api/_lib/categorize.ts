@@ -104,7 +104,13 @@ async function researchMerchant(merchant: string): Promise<string | null> {
       tools: {
         web_search: google.tools.googleSearch({}),
       },
-      stopWhen: stepCountIs(4),
+      // Cada "step" de este loop es una llamada a Gemini aparte, disparada
+      // por el SDK sin pasar por throttleGeminiCall (que solo frena el
+      // punto de entrada de generateText/generateObject) — con
+      // stepCountIs(4) un solo mail ambiguo podía ráfagar hasta 4 requests
+      // casi simultáneas y comerse la cuota de un saque. 2 alcanza para
+      // "buscar + responder" sin ese riesgo de ráfaga.
+      stopWhen: stepCountIs(2),
       prompt: `El texto "${merchant}" es el nombre de un comercio tal como aparece en un resumen de tarjeta o billetera argentina (puede venir truncado, o con el prefijo de un procesador de pagos como MERPAGO/MP). Buscá en internet a qué comercio corresponde y a qué rubro pertenece (ej: supermercado, restaurante, farmacia, transporte, streaming, etc). Respondé en 2-3 líneas, en español, con el nombre real del comercio si lo identificás y su rubro. Si no encontrás nada confiable, decilo explícitamente.`,
     })
     return text
