@@ -1290,6 +1290,22 @@ body {
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
+  /* Sin min-width:0 un grid item no se achica más allá del contenido que
+     tiene adentro (default min-width:auto) — y ese contenido incluye
+     .tx-table, que trae min-width:640px pensado para la tabla de 6
+     columnas de Transacciones. Acá alcanza con nombre + acciones, así que
+     además la capamos en max-width en vez de dejarla estirarse a la mitad
+     de los 1200px de .app-content. */
+  min-width: 0;
+  max-width: 420px;
+}
+
+/* Categorías/Fuentes de ingreso son name + acciones nomás — no necesitan
+   los 640px de .tx-table (pensados para las 6 columnas de Transacciones),
+   que es lo que hacía que estas dos tablas se vieran enormes y, con zoom,
+   que la de la derecha se saliera de la pantalla. */
+.settings-panel .tx-table {
+  min-width: 0;
 }
 
 .settings-panel-header {
