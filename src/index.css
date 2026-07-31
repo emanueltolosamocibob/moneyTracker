@@ -967,6 +967,9 @@ body {
 }
 
 .modal-actions button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
   padding: 0.5rem 1rem;
   border-radius: var(--radius);
   border: 1px solid rgba(255, 255, 255, 0.2);
@@ -989,6 +992,18 @@ body {
 }
 
 .modal-actions button.danger:hover {
+  background: rgba(255, 107, 107, 1);
+}
+
+/* Mismo tratamiento "danger" de .modal-actions button.danger, para botones
+   disparadores fuera de un modal (ej. "Vaciar" en Configuración). */
+.gmail-scan-btn.danger {
+  background: rgba(255, 107, 107, 0.85);
+  border-color: transparent;
+  color: #2a0a0a;
+}
+
+.gmail-scan-btn.danger:hover {
   background: rgba(255, 107, 107, 1);
 }
 
@@ -1344,6 +1359,21 @@ body {
 
 .settings-panel-header h3 {
   margin: 0;
+}
+
+.settings-danger-zone {
+  margin-top: 1.5rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.14);
+  max-width: 420px;
+}
+
+/* .settings-panel es column con align-items:stretch por default — sin esto
+   el botón se estira a los 420px del panel en vez de quedar del tamaño de
+   su contenido, como "Agregar" arriba (que no estira porque vive dentro de
+   .settings-panel-header, una fila). */
+.settings-danger-zone button {
+  align-self: flex-start;
 }
 
 .icon-picker {
