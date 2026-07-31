@@ -26,6 +26,7 @@ export async function scanGmailForUser(admin: Admin, conn: Connection): Promise<
 
   const query = buildGmailQuery(since)
   const messageIds = await listMessageIds(accessToken, query)
+  console.log(`[gmail-scan] user=${conn.user_id} since=${since} query="${query}" matched=${messageIds.length}`)
 
   const { data: existingCategories } = await admin
     .from('categories')
@@ -40,16 +41,26 @@ export async function scanGmailForUser(admin: Admin, conn: Connection): Promise<
   const otrosCategory = categories.find((c) => c.name.toLowerCase() === 'otros')
 
   let inserted = 0
+  let noText = 0
+  let notPayment = 0
+  let conflicts = 0
+  let realErrors = 0
 
   for (const messageId of messageIds) {
     const text = await getMessagePlainText(accessToken, messageId)
-    if (!text) continue
+    if (!text) {
+      noText += 1
+      continue
+    }
 
     const extracted = await extractAndCategorize(
       text,
       categories.map((c) => c.name),
     )
-    if (!extracted.is_payment_confirmation || extracted.amount == null) continue
+    if (!extracted.is_payment_confirmation || extracted.amount == null) {
+      notPayment += 1
+      continue
+    }
 
     let categoryId: string | null = null
     const existingMatch = categories.find((c) => c.name.toLowerCase() === extracted.category.trim().toLowerCase())
@@ -95,9 +106,20 @@ export async function scanGmailForUser(admin: Admin, conn: Connection): Promise<
       seen: false,
     })
 
-    // Ignoramos conflictos de unique(user_id, source_email_id): significa
-    // que ya habíamos procesado este mail en una corrida anterior.
-    if (!insertError) inserted += 1
+    if (!insertError) {
+      inserted += 1
+    } else if (insertError.code === '23505') {
+      // unique(user_id, source_email_id): ya habíamos procesado este mail
+      // en una corrida anterior — esperado, no es un error real.
+      conflicts += 1
+    } else {
+      // Antes esto se descartaba en silencio junto con los conflictos
+      // esperados, así que un error real acá (constraint distinta, columna
+      // NOT NULL, etc.) no dejaba rastro — se veía como "no trajo nada
+      // nuevo" sin ninguna pista de por qué.
+      realErrors += 1
+      console.error(`[gmail-scan] insert failed for message=${messageId}:`, insertError)
+    }
   }
 
   await admin
@@ -105,5 +127,7 @@ export async function scanGmailForUser(admin: Admin, conn: Connection): Promise<
     .update({ last_scanned_at: new Date().toISOString() })
     .eq('user_id', conn.user_id)
 
-  return `ok: ${inserted}/${messageIds.length} nuevas`
+  const summary = `ok: ${inserted}/${messageIds.length} nuevas (sin_texto=${noText} no_es_pago=${notPayment} ya_procesado=${conflicts} error=${realErrors})`
+  console.log(`[gmail-scan] user=${conn.user_id} ${summary}`)
+  return summary
 }
