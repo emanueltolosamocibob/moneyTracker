@@ -133,13 +133,6 @@ export default function Transactions() {
     setIncomeSources(sources ?? [])
     setLoading(false)
     setPage(0)
-
-    // "Nueva" solo se muestra la primera vez: una vez que ya la renderizamos
-    // acá, la marcamos vista para que no vuelva a aparecer en la próxima carga.
-    const unseenIds = (tx ?? []).filter((t) => !t.seen).map((t) => t.id)
-    if (unseenIds.length > 0) {
-      supabase.from('transactions').update({ seen: true }).in('id', unseenIds)
-    }
   }
 
   useEffect(() => {
@@ -179,9 +172,6 @@ export default function Transactions() {
       needs_review: isIncome ? !incomeSourceId : !categoryId,
       payment_method: isIncome ? null : paymentMethod || null,
       card_last4: !isIncome && isCardPayment && cardLast4 ? cardLast4 : null,
-      // El usuario la acaba de tipear: no es "nueva" a los ojos del indicador
-      // naranja, que es solo para lo que trae el escaneo de Gmail.
-      seen: true,
     })
     setSaving(false)
     if (insertError) {
@@ -448,14 +438,7 @@ export default function Transactions() {
                 const source = incomeSources.find((s) => s.id === t.income_source_id)
                 return (
                   <tr key={t.id}>
-                    <td>
-                      {!t.seen && (
-                        <span className="new-badge" title="Nueva">
-                          !
-                        </span>
-                      )}
-                      {new Date(t.occurred_at).toLocaleDateString('es-AR')}
-                    </td>
+                    <td>{new Date(t.occurred_at).toLocaleDateString('es-AR')}</td>
                     <td className="tx-merchant">
                       {t.needs_review && <span className="review-dot" title="Necesita revisión" />}
                       {t.merchant ?? source?.name ?? '—'}
