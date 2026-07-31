@@ -6,10 +6,19 @@ import { extractAndCategorize, NEW_CATEGORY_CONFIDENCE_THRESHOLD } from './categ
 type Admin = ReturnType<typeof supabaseAdmin>
 type Connection = { user_id: string; refresh_token: string; last_scanned_at: string | null }
 
+export interface GmailScanResult {
+  matched: number
+  inserted: number
+  noText: number
+  notPayment: number
+  conflicts: number
+  realErrors: number
+}
+
 // Compartido entre el cron (recorre todas las conexiones) y el endpoint
 // manual /api/gmail/scan (una sola, la del usuario logueado) — ver
 // api/cron/scan-gmail.ts y api/gmail/scan.ts.
-export async function scanGmailForUser(admin: Admin, conn: Connection): Promise<string> {
+export async function scanGmailForUser(admin: Admin, conn: Connection): Promise<GmailScanResult> {
   const accessToken = await refreshAccessToken(conn.refresh_token)
 
   // Nunca busca más atrás que el 1° del mes actual (aunque last_scanned_at
@@ -27,6 +36,24 @@ export async function scanGmailForUser(admin: Admin, conn: Connection): Promise<
   const query = buildGmailQuery(since)
   const messageIds = await listMessageIds(accessToken, query)
   console.log(`[gmail-scan] user=${conn.user_id} since=${since} query="${query}" matched=${messageIds.length}`)
+
+  // last_scanned_at recién avanza si el loop de abajo termina entero sin
+  // tirar — un timeout, un error no atrapado, o quedarse sin cuota de
+  // Gemini a mitad de camino lo deja intacto. Sin este chequeo previo, un
+  // reintento después de una corrida cortada vuelve a gastar 1-3 llamadas a
+  // Gemini por cada mail que ya se había insertado bien, solo para
+  // descubrir recién en el insert que era un conflicto de
+  // unique(user_id, source_email_id) — plata de cuota tirada en mails que
+  // no necesitaban ni un LLM call.
+  let alreadyProcessedIds = new Set<string | null>()
+  if (messageIds.length > 0) {
+    const { data: alreadyProcessed } = await admin
+      .from('transactions')
+      .select('source_email_id')
+      .eq('user_id', conn.user_id)
+      .in('source_email_id', messageIds)
+    alreadyProcessedIds = new Set((alreadyProcessed ?? []).map((t) => t.source_email_id))
+  }
 
   const { data: existingCategories } = await admin
     .from('categories')
@@ -47,6 +74,11 @@ export async function scanGmailForUser(admin: Admin, conn: Connection): Promise<
   let realErrors = 0
 
   for (const messageId of messageIds) {
+    if (alreadyProcessedIds.has(messageId)) {
+      conflicts += 1
+      continue
+    }
+
     const text = await getMessagePlainText(accessToken, messageId)
     if (!text) {
       noText += 1
@@ -127,7 +159,16 @@ export async function scanGmailForUser(admin: Admin, conn: Connection): Promise<
     .update({ last_scanned_at: new Date().toISOString() })
     .eq('user_id', conn.user_id)
 
-  const summary = `ok: ${inserted}/${messageIds.length} nuevas (sin_texto=${noText} no_es_pago=${notPayment} ya_procesado=${conflicts} error=${realErrors})`
-  console.log(`[gmail-scan] user=${conn.user_id} ${summary}`)
-  return summary
+  const result: GmailScanResult = {
+    matched: messageIds.length,
+    inserted,
+    noText,
+    notPayment,
+    conflicts,
+    realErrors,
+  }
+  console.log(
+    `[gmail-scan] user=${conn.user_id} ok: ${inserted}/${messageIds.length} nuevas (sin_texto=${noText} no_es_pago=${notPayment} ya_procesado=${conflicts} error=${realErrors})`,
+  )
+  return result
 }

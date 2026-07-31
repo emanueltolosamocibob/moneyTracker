@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { supabaseAdmin } from '../_lib/supabaseAdmin.js'
-import { scanGmailForUser } from '../_lib/scanGmailForUser.js'
+import { scanGmailForUser, type GmailScanResult } from '../_lib/scanGmailForUser.js'
 
 // Disparado por Vercel Cron (ver vercel.ts). Protegido con CRON_SECRET para
 // que no cualquiera pueda pegarle al endpoint y quemar cuota de Gmail/LLM.
@@ -17,7 +17,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return
   }
 
-  const results: Record<string, string> = {}
+  const results: Record<string, GmailScanResult | string> = {}
 
   for (const conn of connections ?? []) {
     try {

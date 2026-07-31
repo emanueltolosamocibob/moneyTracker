@@ -30,6 +30,29 @@ const extractionSchema = z.object({
 
 export type ExtractedTransaction = z.infer<typeof extractionSchema>
 
+// Gemini free tier ("generate_content_free_tier_requests") es cuota por
+// proyecto, no un saldo en dólares — límites de RPM (requests/minuto), TPM
+// (tokens/minuto) y RPD (requests/día), visibles en aistudio.google.com.
+// gemini-3.6-flash daba apenas 5 RPM / 20 RPD (confirmado por el error real
+// de Google la primera vez que esto se probó con un catch-up grande). Se
+// cambió a gemini-3.5-flash-lite: 15 RPM / 500 RPD con el mismo TPM
+// (250K) — el RPD es lo que más importa acá, un scan de backlog puede
+// necesitar bastantes más de 20 llamadas en total (1 a 3 por mail). Sin
+// espaciar las llamadas, un scan de más de un puñado de mails agota la
+// cuota igual y el SDK tira AI_APICallError tras sus 3 reintentos internos,
+// abortando el resto del loop en scanGmailForUser.ts. Estado a nivel de
+// módulo a propósito: en Fluid Compute la misma instancia puede atender
+// múltiples invocaciones, así que esto también frena llamadas de corridas
+// concurrentes, no solo dentro de un mismo scan.
+const MIN_GEMINI_CALL_INTERVAL_MS = 4_500
+let lastGeminiCallAt = 0
+
+async function throttleGeminiCall() {
+  const wait = lastGeminiCallAt + MIN_GEMINI_CALL_INTERVAL_MS - Date.now()
+  if (wait > 0) await new Promise((resolve) => setTimeout(resolve, wait))
+  lastGeminiCallAt = Date.now()
+}
+
 const LOW_CONFIDENCE_THRESHOLD = 0.6
 
 // Umbral más exigente que el de revisión manual: crear una categoría nueva
@@ -39,15 +62,17 @@ const LOW_CONFIDENCE_THRESHOLD = 0.6
 export const NEW_CATEGORY_CONFIDENCE_THRESHOLD = 0.85
 
 async function runExtraction(emailText: string, categoryNames: string[], merchantResearch?: string) {
+  await throttleGeminiCall()
   const { object } = await generateObject({
     // Provider directo de Google (no pasa por Vercel AI Gateway): la cuenta
     // de AI Gateway está en el plan free, que además de bloquear modelos de
     // Anthropic ("Free tier users do not have access to this model") tiene
     // un rate limit de requests/minuto muy bajo que un escaneo con varios
     // mails supera fácil. Gemini vía API key propia de Google AI Studio
-    // (GOOGLE_GENERATIVE_AI_API_KEY) tiene un free tier real, sin tarjeta,
-    // con límites más generosos.
-    model: google('gemini-3.6-flash'),
+    // (GOOGLE_GENERATIVE_AI_API_KEY) tiene un free tier real, sin tarjeta —
+    // ver el comentario sobre MIN_GEMINI_CALL_INTERVAL_MS más arriba para
+    // los límites reales y por qué se eligió este modelo puntual.
+    model: google('gemini-3.5-flash-lite'),
     schema: extractionSchema,
     prompt: `Analizá este email de banco/billetera y extraé los datos del pago o transferencia.
 Si el mail no confirma un pago real (ej. es publicidad, resumen mensual, o aviso genérico), marcá is_payment_confirmation en false.
@@ -73,8 +98,9 @@ ${merchantResearch ? `\nInformación adicional sobre el comercio (de una búsque
 // en la web para intentar identificar el rubro real antes de categorizar.
 async function researchMerchant(merchant: string): Promise<string | null> {
   try {
+    await throttleGeminiCall()
     const { text } = await generateText({
-      model: google('gemini-3.6-flash'),
+      model: google('gemini-3.5-flash-lite'),
       tools: {
         web_search: google.tools.googleSearch({}),
       },
