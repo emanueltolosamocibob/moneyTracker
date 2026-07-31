@@ -76,6 +76,29 @@ function isoToDateInput(iso: string) {
   return `${y}-${m}-${day}`
 }
 
+function currentMonthStart() {
+  const d = new Date()
+  return new Date(d.getFullYear(), d.getMonth(), 1)
+}
+
+// [inicio del mes, inicio del mes siguiente) — mismo patrón de rango
+// exclusivo que usa Budgets.tsx para no engancharse un día del mes de al
+// lado por corte de huso horario.
+function monthRangeISO(monthStart: Date) {
+  const start = new Date(monthStart.getFullYear(), monthStart.getMonth(), 1)
+  const end = new Date(monthStart.getFullYear(), monthStart.getMonth() + 1, 1)
+  return { startISO: start.toISOString(), endISO: end.toISOString() }
+}
+
+function formatMonthLabel(monthStart: Date) {
+  const label = monthStart.toLocaleDateString('es-AR', { month: 'long', year: 'numeric' })
+  return label.charAt(0).toUpperCase() + label.slice(1)
+}
+
+function isSameMonth(a: Date, b: Date) {
+  return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth()
+}
+
 export default function Transactions() {
   const { user } = useAuth()
   const [transactions, setTransactions] = useState<Transaction[]>([])
@@ -105,6 +128,11 @@ export default function Transactions() {
 
   const [page, setPage] = useState(0)
   const [pageSize, setPageSize] = useState<PageSize>(20)
+  // Mes que se está mostrando — cada cambio dispara load() de nuevo, que
+  // trae de la base solo las transacciones de ese mes (no un fetch general
+  // con límite fijo como antes).
+  const [selectedMonth, setSelectedMonth] = useState(currentMonthStart)
+  const [categoryFilterId, setCategoryFilterId] = useState('')
   // Acordeón del form en mobile (ver media query en index.css): en desktop
   // el form siempre está visible y este estado se ignora vía CSS.
   const [formOpen, setFormOpen] = useState(false)
@@ -129,8 +157,15 @@ export default function Transactions() {
 
   async function load() {
     setLoading(true)
+    const { startISO, endISO } = monthRangeISO(selectedMonth)
     const [{ data: tx, error: txError }, { data: cats }, { data: sources }] = await Promise.all([
-      supabase.from('transactions').select('*').order('occurred_at', { ascending: false }).limit(FETCH_LIMIT),
+      supabase
+        .from('transactions')
+        .select('*')
+        .gte('occurred_at', startISO)
+        .lt('occurred_at', endISO)
+        .order('occurred_at', { ascending: false })
+        .limit(FETCH_LIMIT),
       supabase.from('categories').select('*').order('name'),
       supabase.from('income_sources').select('*').order('name'),
     ])
@@ -144,17 +179,35 @@ export default function Transactions() {
 
   useEffect(() => {
     load()
-  }, [])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedMonth])
 
+  // "Interno" son transferencias entre las propias cuentas del usuario (ver
+  // handleInlineCategoryChange y el mismo criterio aplicado en
+  // scanGmailForUser.ts) — no son ni ingreso ni gasto real, así que no
+  // cuentan para ninguno de los totales.
   const totals = useMemo(() => {
-    const income = transactions.filter((t) => t.type === 'income').reduce((sum, t) => sum + t.amount, 0)
-    const expense = transactions.filter((t) => t.type === 'expense').reduce((sum, t) => sum + t.amount, 0)
-    return { income, expense, net: income - expense }
-  }, [transactions])
+    const relevant = transactions.filter((t) => {
+      const cat = categories.find((c) => c.id === t.category_id)
+      return cat?.name !== 'Interno'
+    })
+    const income = relevant.filter((t) => t.type === 'income').reduce((sum, t) => sum + t.amount, 0)
+    const expenseARS = relevant
+      .filter((t) => t.type === 'expense' && t.currency === 'ARS')
+      .reduce((sum, t) => sum + t.amount, 0)
+    const expenseUSD = relevant
+      .filter((t) => t.type === 'expense' && t.currency === 'USD')
+      .reduce((sum, t) => sum + t.amount, 0)
+    return { income, expense: expenseARS, expenseUSD, net: income - expenseARS }
+  }, [transactions, categories])
 
-  const pageCount = pageSize === 'all' ? 1 : Math.max(1, Math.ceil(transactions.length / pageSize))
+  const visibleTransactions = categoryFilterId
+    ? transactions.filter((t) => t.category_id === categoryFilterId)
+    : transactions
+
+  const pageCount = pageSize === 'all' ? 1 : Math.max(1, Math.ceil(visibleTransactions.length / pageSize))
   const pagedTransactions =
-    pageSize === 'all' ? transactions : transactions.slice(page * pageSize, page * pageSize + pageSize)
+    pageSize === 'all' ? visibleTransactions : visibleTransactions.slice(page * pageSize, page * pageSize + pageSize)
 
   async function handleAdd(e: FormEvent) {
     e.preventDefault()
@@ -239,6 +292,40 @@ export default function Transactions() {
     void deleteTransaction(t)
   }
 
+  // Cambio de categoría directo desde la tabla, sin pasar por el modal de
+  // edición — actualiza optimistamente el estado local en vez de recargar
+  // todo (evita el parpadeo de la tabla por un cambio de un solo campo).
+  async function handleInlineCategoryChange(t: Transaction, newCategoryId: string) {
+    const { error: updateError } = await supabase
+      .from('transactions')
+      .update({ category_id: newCategoryId || null, needs_review: !newCategoryId })
+      .eq('id', t.id)
+    if (updateError) {
+      setError(updateError.message)
+      return
+    }
+    setTransactions((prev) =>
+      prev.map((tx) =>
+        tx.id === t.id ? { ...tx, category_id: newCategoryId || null, needs_review: !newCategoryId } : tx,
+      ),
+    )
+
+    // Misma normalización que api/_lib/parseEmailTemplate.ts (trim +
+    // mayúsculas + espacios colapsados) — una corrección manual acá
+    // alimenta la misma caché comercio->categoría que usa el scan de Gmail,
+    // así que el próximo mail de este comercio ya sale bien categorizado
+    // sin gastar Gemini.
+    if (t.merchant && newCategoryId && user) {
+      const merchantKey = t.merchant.trim().toUpperCase().replace(/\s+/g, ' ')
+      await supabase
+        .from('merchant_categories')
+        .upsert(
+          { user_id: user.id, merchant_key: merchantKey, category_id: newCategoryId, updated_at: new Date().toISOString() },
+          { onConflict: 'user_id,merchant_key' },
+        )
+    }
+  }
+
   async function deleteTransaction(t: Transaction) {
     const { error: deleteError } = await supabase.from('transactions').delete().eq('id', t.id)
     if (deleteError) {
@@ -294,6 +381,14 @@ export default function Transactions() {
     load()
   }
 
+  function goToPrevMonth() {
+    setSelectedMonth((d) => new Date(d.getFullYear(), d.getMonth() - 1, 1))
+  }
+
+  function goToNextMonth() {
+    setSelectedMonth((d) => new Date(d.getFullYear(), d.getMonth() + 1, 1))
+  }
+
   async function handleScanGmail() {
     setScanning(true)
     setError(null)
@@ -338,6 +433,27 @@ export default function Transactions() {
         <button type="button" className="gmail-scan-btn" onClick={handleScanGmail} disabled={scanning}>
           <IconRefresh /> {scanning ? 'Sincronizando...' : 'Sincronizar'}
         </button>
+      </div>
+
+      <div className="tx-summary">
+        <div>
+          <span>Ingresos</span>
+          <strong className="tx-amount income">{formatCurrency(totals.income, 'ARS')}</strong>
+        </div>
+        <div>
+          <span>Egresos</span>
+          <strong className="tx-amount">
+            {formatCurrency(totals.expense, 'ARS')}
+            {totals.expenseUSD > 0 &&
+              ` + USD ${totals.expenseUSD.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+          </strong>
+        </div>
+        <div className="tx-summary-net">
+          <span>Neto</span>
+          <strong className={`tx-amount ${totals.net < 0 ? 'negative' : ''}`}>
+            {formatCurrency(totals.net, 'ARS')}
+          </strong>
+        </div>
       </div>
 
       <button
@@ -435,6 +551,35 @@ export default function Transactions() {
         </button>
       </form>
 
+      <div className="tx-controls">
+        <div className="tx-month-nav">
+          <button type="button" aria-label="Mes anterior" onClick={goToPrevMonth}>
+            ‹
+          </button>
+          <span>{formatMonthLabel(selectedMonth)}</span>
+          <button
+            type="button"
+            aria-label="Mes siguiente"
+            disabled={isSameMonth(selectedMonth, currentMonthStart())}
+            onClick={goToNextMonth}
+          >
+            ›
+          </button>
+        </div>
+        <div className="tx-controls-right">
+          <Select
+            value={categoryFilterId}
+            onChange={(v) => {
+              setCategoryFilterId(v)
+              setPage(0)
+            }}
+            placeholder="Todas las categorías"
+            options={categories.map((c) => ({ value: c.id, label: c.name, icon: getCategoryIcon(c.name, c.icon) }))}
+          />
+          <span className="tx-counter">Transacciones: {visibleTransactions.length}</span>
+        </div>
+      </div>
+
       {error && <p className="error">{error}</p>}
       {loading ? (
         <p>Cargando...</p>
@@ -459,7 +604,6 @@ export default function Transactions() {
             </thead>
             <tbody>
               {pagedTransactions.map((t) => {
-                const cat = categories.find((c) => c.id === t.category_id)
                 const source = incomeSources.find((s) => s.id === t.income_source_id)
                 return (
                   <tr key={t.id}>
@@ -469,12 +613,19 @@ export default function Transactions() {
                       {t.merchant ?? source?.name ?? '—'}
                     </td>
                     <td className="tx-category">
-                      {cat ? (
-                        <span className="tx-category-inner">
-                          {getCategoryIcon(cat.name, cat.icon)} {cat.name}
-                        </span>
-                      ) : (
+                      {t.type === 'income' ? (
                         '—'
+                      ) : (
+                        <Select
+                          value={t.category_id ?? ''}
+                          onChange={(v) => handleInlineCategoryChange(t, v)}
+                          placeholder="Sin categoría"
+                          options={categories.map((c) => ({
+                            value: c.id,
+                            label: c.name,
+                            icon: getCategoryIcon(c.name, c.icon),
+                          }))}
+                        />
                       )}
                     </td>
                     <td className="tx-payment-method">
@@ -507,23 +658,6 @@ export default function Transactions() {
               })}
             </tbody>
           </table>
-          </div>
-
-          <div className="tx-summary">
-            <div>
-              <span>Ingresos</span>
-              <strong className="tx-amount income">{formatCurrency(totals.income, 'ARS')}</strong>
-            </div>
-            <div>
-              <span>Egresos</span>
-              <strong className="tx-amount">{formatCurrency(totals.expense, 'ARS')}</strong>
-            </div>
-            <div className="tx-summary-net">
-              <span>Neto</span>
-              <strong className={`tx-amount ${totals.net < 0 ? 'negative' : ''}`}>
-                {formatCurrency(totals.net, 'ARS')}
-              </strong>
-            </div>
           </div>
 
           <div className="tx-pagination">
@@ -569,22 +703,6 @@ export default function Transactions() {
         <Modal>
           <h3>Editar transacción</h3>
           <form className="tx-edit-form" onSubmit={handleEditSubmit} noValidate>
-            <div className="type-toggle" role="group" aria-label="Tipo de movimiento">
-              <button
-                type="button"
-                className={editType === 'expense' ? 'active' : ''}
-                onClick={() => setEditType('expense')}
-              >
-                Egreso
-              </button>
-              <button
-                type="button"
-                className={editType === 'income' ? 'active income' : ''}
-                onClick={() => setEditType('income')}
-              >
-                Ingreso
-              </button>
-            </div>
             <input type="date" value={editOccurredAt} onChange={(e) => setEditOccurredAt(e.target.value)} />
             <div className="tx-field">
               <input
