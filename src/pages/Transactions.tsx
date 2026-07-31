@@ -94,7 +94,9 @@ export default function Transactions() {
   const [type, setType] = useState<TransactionType>('expense')
   const [saving, setSaving] = useState(false)
   const [scanning, setScanning] = useState(false)
-  const [scanResult, setScanResult] = useState<string | null>(null)
+  // Cantidad de transacciones nuevas insertadas en el último scan (null =
+  // no se mostró el diálogo de resultado todavía, o ya se cerró).
+  const [scanInsertedCount, setScanInsertedCount] = useState<number | null>(null)
   const [amountError, setAmountError] = useState<string | null>(null)
 
   const [page, setPage] = useState(0)
@@ -291,7 +293,6 @@ export default function Transactions() {
   async function handleScanGmail() {
     setScanning(true)
     setError(null)
-    setScanResult(null)
     try {
       const { data } = await supabase.auth.getSession()
       const res = await fetch('/api/gmail/scan', {
@@ -300,7 +301,7 @@ export default function Transactions() {
       })
       const json = await res.json()
       if (!res.ok) throw new Error(json.error ?? 'No se pudo escanear Gmail')
-      setScanResult(json.result ?? null)
+      setScanInsertedCount(json.result?.inserted ?? 0)
       await load()
     } catch (err) {
       setError((err as Error).message)
@@ -414,7 +415,6 @@ export default function Transactions() {
       </form>
 
       {error && <p className="error">{error}</p>}
-      {scanResult && <p className="empty-state">{scanResult}</p>}
       {loading ? (
         <p>Cargando...</p>
       ) : transactions.length === 0 ? (
@@ -668,6 +668,24 @@ export default function Transactions() {
           <div className="modal-panel-sync">
             <IconRefresh size={28} />
             <p>Sincronizando con Gmail...</p>
+          </div>
+        </Modal>
+      )}
+
+      {scanInsertedCount !== null && (
+        <Modal>
+          <h3>Sincronización completa</h3>
+          <p>
+            {scanInsertedCount === 0
+              ? 'No se encontraron transacciones nuevas.'
+              : scanInsertedCount === 1
+                ? 'Se encontró 1 transacción nueva.'
+                : `Se encontraron ${scanInsertedCount} transacciones nuevas.`}
+          </p>
+          <div className="modal-actions">
+            <button type="button" className="primary" onClick={() => setScanInsertedCount(null)}>
+              Cerrar
+            </button>
           </div>
         </Modal>
       )}
