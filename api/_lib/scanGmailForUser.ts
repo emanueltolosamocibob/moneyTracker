@@ -28,6 +28,24 @@ export async function scanGmailForUser(admin: Admin, conn: Connection): Promise<
   const messageIds = await listMessageIds(accessToken, query)
   console.log(`[gmail-scan] user=${conn.user_id} since=${since} query="${query}" matched=${messageIds.length}`)
 
+  // last_scanned_at recién avanza si el loop de abajo termina entero sin
+  // tirar — un timeout, un error no atrapado, o quedarse sin cuota de
+  // Gemini a mitad de camino lo deja intacto. Sin este chequeo previo, un
+  // reintento después de una corrida cortada vuelve a gastar 1-3 llamadas a
+  // Gemini por cada mail que ya se había insertado bien, solo para
+  // descubrir recién en el insert que era un conflicto de
+  // unique(user_id, source_email_id) — plata de cuota tirada en mails que
+  // no necesitaban ni un LLM call.
+  let alreadyProcessedIds = new Set<string | null>()
+  if (messageIds.length > 0) {
+    const { data: alreadyProcessed } = await admin
+      .from('transactions')
+      .select('source_email_id')
+      .eq('user_id', conn.user_id)
+      .in('source_email_id', messageIds)
+    alreadyProcessedIds = new Set((alreadyProcessed ?? []).map((t) => t.source_email_id))
+  }
+
   const { data: existingCategories } = await admin
     .from('categories')
     .select('id, name')
@@ -47,6 +65,11 @@ export async function scanGmailForUser(admin: Admin, conn: Connection): Promise<
   let realErrors = 0
 
   for (const messageId of messageIds) {
+    if (alreadyProcessedIds.has(messageId)) {
+      conflicts += 1
+      continue
+    }
+
     const text = await getMessagePlainText(accessToken, messageId)
     if (!text) {
       noText += 1
