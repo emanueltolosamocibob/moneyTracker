@@ -462,10 +462,12 @@ export default function Budgets() {
                 const cat = categories.find((c) => c.id === item.category_id)
                 const spent = spentForCategory(item.category_id)
                 const pct = item.amount > 0 ? (spent / item.amount) * 100 : 0
+                const status = pct >= 100 ? 'over' : pct >= 80 ? 'warn' : ''
                 return (
                   <div className="budget-card" key={item.id}>
                     <BudgetRing pct={pct} icon={getCategoryIcon(cat?.name, cat?.icon)} />
-                    <strong className="budget-card-spent">{formatCurrency(spent, 'ARS')}</strong>
+                    <strong className={`budget-card-spent ${status}`}>{formatCurrency(spent, 'ARS')}</strong>
+                    <span className="budget-card-limit">de {formatCurrency(item.amount, 'ARS')}</span>
                     <span className="budget-card-title">{cat?.name ?? '—'}</span>
                   </div>
                 )
