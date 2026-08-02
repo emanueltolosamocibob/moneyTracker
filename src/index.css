@@ -1289,6 +1289,21 @@ body {
   font-family: var(--font-mono);
 }
 
+.budget-card-spent.warn {
+  color: var(--warning);
+}
+
+.budget-card-spent.over {
+  color: var(--danger);
+}
+
+.budget-card-limit {
+  color: rgba(255, 255, 255, 0.55);
+  font-size: 0.8rem;
+  font-family: var(--font-mono);
+  margin-top: -0.3rem;
+}
+
 .budget-card-title {
   color: rgba(255, 255, 255, 0.75);
   font-size: 0.85rem;
