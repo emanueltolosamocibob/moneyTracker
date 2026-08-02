@@ -67,14 +67,27 @@ export interface BudgetItem {
   created_at: string
 }
 
-export interface Investment {
+export type InvestmentMarket = 'ar' | 'world'
+
+export interface InvestmentLot {
   id: string
   user_id: string
-  name: string
-  kind: string
-  quantity: number
-  unit_cost: number
-  currency: string
+  symbol: string
+  market: InvestmentMarket
+  buy_date: string // 'YYYY-MM-DD'
+  buy_quantity: number
+  buy_price: number
+  remaining_quantity: number
+  created_at: string
+}
+
+export interface InvestmentSale {
+  id: string
+  user_id: string
+  lot_id: string
+  sell_date: string // 'YYYY-MM-DD'
+  sell_quantity: number
+  sell_price: number
   created_at: string
 }
 
@@ -120,10 +133,16 @@ export interface Database {
         Update: Partial<BudgetItem>
         Relationships: []
       }
-      investments: {
-        Row: Investment
-        Insert: Partial<Investment>
-        Update: Partial<Investment>
+      investment_lots: {
+        Row: InvestmentLot
+        Insert: Partial<InvestmentLot>
+        Update: Partial<InvestmentLot>
+        Relationships: []
+      }
+      investment_sales: {
+        Row: InvestmentSale
+        Insert: Partial<InvestmentSale>
+        Update: Partial<InvestmentSale>
         Relationships: []
       }
       gmail_connections: {
