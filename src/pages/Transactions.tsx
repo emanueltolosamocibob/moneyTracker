@@ -516,8 +516,6 @@ export default function Transactions() {
               onChange={setCategoryId}
               placeholder="Sin categoría"
               options={categories.map((c) => ({ value: c.id, label: c.name, icon: getCategoryIcon(c.name, c.icon) }))}
-              onCreate={handleCreateCategory}
-              createLabel="Agregar categoría"
             />
             <Select
               value={paymentMethod}
@@ -567,6 +565,7 @@ export default function Transactions() {
           </button>
         </div>
         <div className="tx-controls-right">
+          <span className="tx-counter">Transacciones: {visibleTransactions.length}</span>
           <Select
             value={categoryFilterId}
             onChange={(v) => {
@@ -576,7 +575,6 @@ export default function Transactions() {
             placeholder="Todas las categorías"
             options={categories.map((c) => ({ value: c.id, label: c.name, icon: getCategoryIcon(c.name, c.icon) }))}
           />
-          <span className="tx-counter">Transacciones: {visibleTransactions.length}</span>
         </div>
       </div>
 

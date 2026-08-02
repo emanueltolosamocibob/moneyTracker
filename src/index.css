@@ -416,7 +416,13 @@ body {
 }
 
 .tx-form input {
+  /* min-width: 0 pisa el default min-width:auto de los flex items — sin
+     esto, input[type=date] puede no encoger por debajo de su ancho
+     intrínseco (segmentos día/mes/año + ícono nativo) y desborda el form en
+     mobile, sobre todo en iOS Safari, aunque width:100% diga lo contrario. */
   width: 100%;
+  min-width: 0;
+  max-width: 100%;
   padding: 0.5rem;
   border-radius: var(--radius);
   border: 1px solid rgba(255, 255, 255, 0.2);
@@ -974,9 +980,9 @@ body {
 
 .tx-summary {
   display: flex;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-  gap: 1.5rem 2rem;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.6rem;
   margin-top: 1rem;
   margin-bottom: 2rem;
   padding-top: 1rem;
@@ -997,6 +1003,11 @@ body {
 
 .tx-summary .tx-amount {
   font-size: 2.2rem;
+}
+
+.tx-summary > div:first-child .tx-amount,
+.tx-summary-net .tx-amount {
+  font-size: 1.3rem;
 }
 
 .empty-state {
