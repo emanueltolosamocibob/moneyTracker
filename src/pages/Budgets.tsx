@@ -228,6 +228,8 @@ export default function Budgets() {
 
   const totalBudgeted = useMemo(() => items.reduce((sum, it) => sum + it.amount, 0), [items])
   const totalSpent = useMemo(() => spentTx.reduce((sum, t) => sum + t.amount, 0), [spentTx])
+  const totalSpentPct = totalBudgeted > 0 ? (totalSpent / totalBudgeted) * 100 : 0
+  const totalSpentStatus = totalSpentPct >= 100 ? 'over' : totalSpentPct >= 80 ? 'warn' : ''
 
   function spentForCategory(categoryId: string) {
     return spentTx.filter((t) => t.category_id === categoryId).reduce((sum, t) => sum + t.amount, 0)
@@ -449,7 +451,7 @@ export default function Budgets() {
             </div>
             <div className="budget-summary-spent">
               <span>Gastado</span>
-              <strong className="budget-summary-amount">{formatCurrency(totalSpent, 'ARS')}</strong>
+              <strong className={`budget-summary-amount ${totalSpentStatus}`}>{formatCurrency(totalSpent, 'ARS')}</strong>
             </div>
           </div>
           <p className="budget-period-label">{formatPeriodLabel(period.period_type, period.period_start, period.period_end)}</p>

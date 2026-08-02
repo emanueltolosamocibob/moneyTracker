@@ -1,12 +1,457 @@
+import { useEffect, useMemo, useState, type FormEvent } from 'react'
+import { supabase } from '../lib/supabaseClient'
+import { useAuth } from '../lib/AuthContext'
+import type { InvestmentLot, InvestmentMarket, InvestmentSale } from '../types/database'
+import { IconChevronDown, IconPlus } from '../components/icons'
+import Modal from '../components/Modal'
+
+const MARKET_LABELS: Record<InvestmentMarket, string> = {
+  ar: 'Acción Argentina',
+  world: 'Acción del mundo',
+}
+
+const MARKET_CURRENCY: Record<InvestmentMarket, string> = {
+  ar: 'ARS',
+  world: 'USD',
+}
+
+function formatMoney(amount: number, currency: string) {
+  return amount.toLocaleString('es-AR', { style: 'currency', currency, minimumFractionDigits: 2, maximumFractionDigits: 2 })
+}
+
+function todayDateInput() {
+  return new Date().toISOString().slice(0, 10)
+}
+
+// Mismo motivo que en Transactions.tsx/Budgets.tsx: armar la fecha con
+// año/mes/día sueltos usa medianoche local, evitando que se corra un día.
+function formatDateShort(dateStr: string) {
+  const [y, m, d] = dateStr.split('-').map(Number)
+  return new Date(y, m - 1, d).toLocaleDateString('es-AR')
+}
+
+interface Holding {
+  symbol: string
+  market: InvestmentMarket
+  totalQuantity: number
+  avgBuyPrice: number
+  // Lotes con remaining_quantity > 0, ordenados FIFO (más viejo primero) —
+  // una venta los consume en este orden.
+  lots: InvestmentLot[]
+}
+
+interface MovementRow {
+  key: string
+  symbol: string
+  market: InvestmentMarket
+  buyDate: string
+  buyQuantity: number
+  buyPrice: number
+  sellDate: string | null
+  sellQuantity: number | null
+  sellPrice: number | null
+  gainPct: number | null
+  gainAmount: number | null
+  sortDate: string
+}
+
 export default function Investments() {
+  const { user } = useAuth()
+  const [lots, setLots] = useState<InvestmentLot[]>([])
+  const [sales, setSales] = useState<InvestmentSale[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  const [formOpen, setFormOpen] = useState(false)
+  const [market, setMarket] = useState<InvestmentMarket>('ar')
+  const [symbol, setSymbol] = useState('')
+  const [price, setPrice] = useState('')
+  const [quantity, setQuantity] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [formError, setFormError] = useState<string | null>(null)
+
+  const [sellHolding, setSellHolding] = useState<Holding | null>(null)
+  const [sellQuantity, setSellQuantity] = useState('')
+  const [sellPrice, setSellPrice] = useState('')
+  const [sellSaving, setSellSaving] = useState(false)
+  const [sellError, setSellError] = useState<string | null>(null)
+
+  async function load() {
+    if (!user) return
+    setLoading(true)
+    setError(null)
+
+    const [{ data: lotsData, error: lotsError }, { data: salesData, error: salesError }] = await Promise.all([
+      supabase.from('investment_lots').select('*').order('buy_date', { ascending: true }),
+      supabase.from('investment_sales').select('*').order('sell_date', { ascending: false }),
+    ])
+
+    if (lotsError || salesError) {
+      setError(lotsError?.message ?? salesError?.message ?? 'Error al cargar inversiones')
+      setLoading(false)
+      return
+    }
+
+    setLots(lotsData ?? [])
+    setSales(salesData ?? [])
+    setLoading(false)
+  }
+
+  useEffect(() => {
+    load()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user])
+
+  const holdings = useMemo<Holding[]>(() => {
+    const groups = new Map<string, Holding>()
+    for (const lot of lots) {
+      if (lot.remaining_quantity <= 0) continue
+      const key = `${lot.symbol}__${lot.market}`
+      let holding = groups.get(key)
+      if (!holding) {
+        holding = { symbol: lot.symbol, market: lot.market, totalQuantity: 0, avgBuyPrice: 0, lots: [] }
+        groups.set(key, holding)
+      }
+      holding.lots.push(lot)
+      holding.totalQuantity += lot.remaining_quantity
+    }
+    for (const holding of groups.values()) {
+      holding.lots.sort((a, b) => (a.buy_date < b.buy_date ? -1 : a.buy_date > b.buy_date ? 1 : a.created_at.localeCompare(b.created_at)))
+      const totalCost = holding.lots.reduce((sum, l) => sum + l.remaining_quantity * l.buy_price, 0)
+      holding.avgBuyPrice = holding.totalQuantity > 0 ? totalCost / holding.totalQuantity : 0
+    }
+    return Array.from(groups.values()).sort((a, b) => a.symbol.localeCompare(b.symbol))
+  }, [lots])
+
+  const movements = useMemo<MovementRow[]>(() => {
+    const lotById = new Map(lots.map((l) => [l.id, l]))
+    const rows: MovementRow[] = []
+
+    for (const sale of sales) {
+      const lot = lotById.get(sale.lot_id)
+      if (!lot) continue
+      const gainPct = lot.buy_price > 0 ? ((sale.sell_price - lot.buy_price) / lot.buy_price) * 100 : 0
+      rows.push({
+        key: `sale-${sale.id}`,
+        symbol: lot.symbol,
+        market: lot.market,
+        buyDate: lot.buy_date,
+        buyQuantity: sale.sell_quantity,
+        buyPrice: lot.buy_price,
+        sellDate: sale.sell_date,
+        sellQuantity: sale.sell_quantity,
+        sellPrice: sale.sell_price,
+        gainPct,
+        gainAmount: (sale.sell_price - lot.buy_price) * sale.sell_quantity,
+        sortDate: sale.sell_date,
+      })
+    }
+
+    for (const lot of lots) {
+      if (lot.remaining_quantity <= 0) continue
+      rows.push({
+        key: `open-${lot.id}`,
+        symbol: lot.symbol,
+        market: lot.market,
+        buyDate: lot.buy_date,
+        buyQuantity: lot.remaining_quantity,
+        buyPrice: lot.buy_price,
+        sellDate: null,
+        sellQuantity: null,
+        sellPrice: null,
+        gainPct: null,
+        gainAmount: null,
+        sortDate: lot.buy_date,
+      })
+    }
+
+    return rows.sort((a, b) => (a.sortDate < b.sortDate ? 1 : a.sortDate > b.sortDate ? -1 : 0))
+  }, [lots, sales])
+
+  async function handleAdd(e: FormEvent) {
+    e.preventDefault()
+    if (!user) return
+    setFormError(null)
+
+    const trimmedSymbol = symbol.trim().toUpperCase()
+    const priceNum = Number(price)
+    const qtyNum = Number(quantity)
+
+    if (!trimmedSymbol) {
+      setFormError('Ingresá un símbolo.')
+      return
+    }
+    if (!(priceNum > 0)) {
+      setFormError('El valor tiene que ser mayor a 0.')
+      return
+    }
+    if (!(qtyNum > 0)) {
+      setFormError('La cantidad tiene que ser mayor a 0.')
+      return
+    }
+
+    setSaving(true)
+    const { error: insertError } = await supabase.from('investment_lots').insert({
+      user_id: user.id,
+      symbol: trimmedSymbol,
+      market,
+      buy_date: todayDateInput(),
+      buy_quantity: qtyNum,
+      buy_price: priceNum,
+      remaining_quantity: qtyNum,
+    })
+    setSaving(false)
+
+    if (insertError) {
+      setFormError(insertError.message)
+      return
+    }
+
+    setSymbol('')
+    setPrice('')
+    setQuantity('')
+    setFormOpen(false)
+    load()
+  }
+
+  function openSell(holding: Holding) {
+    setSellHolding(holding)
+    setSellQuantity(String(holding.totalQuantity))
+    setSellPrice('')
+    setSellError(null)
+  }
+
+  async function handleSell(e: FormEvent) {
+    e.preventDefault()
+    if (!user || !sellHolding) return
+    setSellError(null)
+
+    const qtyNum = Number(sellQuantity)
+    const priceNum = Number(sellPrice)
+
+    if (!(qtyNum > 0)) {
+      setSellError('La cantidad tiene que ser mayor a 0.')
+      return
+    }
+    if (qtyNum > sellHolding.totalQuantity) {
+      setSellError(`No podés vender más de ${sellHolding.totalQuantity} unidades.`)
+      return
+    }
+    if (!(priceNum > 0)) {
+      setSellError('El precio tiene que ser mayor a 0.')
+      return
+    }
+
+    setSellSaving(true)
+    const todayStr = todayDateInput()
+    let remainingToSell = qtyNum
+
+    // Consume los lotes de esta tenencia en orden FIFO hasta cubrir la
+    // cantidad vendida — una venta parcial puede terminar tocando más de un
+    // lote, cada uno queda como su propia fila en Movimientos con la
+    // ganancia calculada contra su propio precio de compra.
+    for (const lot of sellHolding.lots) {
+      if (remainingToSell <= 0) break
+      const take = Math.min(remainingToSell, lot.remaining_quantity)
+      if (take <= 0) continue
+
+      const { error: saleError } = await supabase.from('investment_sales').insert({
+        user_id: user.id,
+        lot_id: lot.id,
+        sell_date: todayStr,
+        sell_quantity: take,
+        sell_price: priceNum,
+      })
+      if (saleError) {
+        setSellSaving(false)
+        setSellError(saleError.message)
+        return
+      }
+
+      const { error: updateError } = await supabase
+        .from('investment_lots')
+        .update({ remaining_quantity: lot.remaining_quantity - take })
+        .eq('id', lot.id)
+      if (updateError) {
+        setSellSaving(false)
+        setSellError(updateError.message)
+        return
+      }
+
+      remainingToSell -= take
+    }
+
+    setSellSaving(false)
+    setSellHolding(null)
+    load()
+  }
+
   return (
     <div>
-      <h2>Inversiones</h2>
-      <p className="empty-state">
-        Próximamente: seguimiento de cartera (acciones, cripto, plazo fijo,
-        etc.). La tabla <code>investments</code> ya existe en la base, falta
-        la UI y la integración de cotizaciones.
-      </p>
+      <div className="tx-header">
+        <h2>Inversiones</h2>
+      </div>
+
+      {error && <p className="error">{error}</p>}
+
+      <button
+        type="button"
+        className={`tx-form-toggle${formOpen ? ' open' : ''}`}
+        onClick={() => setFormOpen((o) => !o)}
+        aria-expanded={formOpen}
+      >
+        <IconPlus size={14} /> Agregar símbolo
+        <IconChevronDown size={16} />
+      </button>
+
+      <form className={`tx-form${formOpen ? ' open' : ''}`} onSubmit={handleAdd} noValidate>
+        <div className="type-toggle" role="group" aria-label="Tipo de activo">
+          <button type="button" className={market === 'ar' ? 'active' : ''} onClick={() => setMarket('ar')}>
+            Acción Argentina
+          </button>
+          <button type="button" className={market === 'world' ? 'active' : ''} onClick={() => setMarket('world')}>
+            Acción del mundo
+          </button>
+        </div>
+        <input type="text" placeholder="Símbolo" value={symbol} onChange={(e) => setSymbol(e.target.value.toUpperCase())} />
+        <input
+          type="number"
+          step="0.01"
+          min="0"
+          placeholder={`Valor (${MARKET_CURRENCY[market]})`}
+          value={price}
+          onChange={(e) => setPrice(e.target.value)}
+        />
+        <input type="number" step="any" min="0" placeholder="Cantidad" value={quantity} onChange={(e) => setQuantity(e.target.value)} />
+        <button type="submit" disabled={saving}>
+          {saving ? (
+            'Guardando...'
+          ) : (
+            <>
+              <IconPlus /> Agregar
+            </>
+          )}
+        </button>
+      </form>
+      {formError && <p className="error">{formError}</p>}
+
+      <h3>Cartera actual</h3>
+      {loading ? (
+        <p>Cargando...</p>
+      ) : holdings.length === 0 ? (
+        <p className="empty-state">Todavía no cargaste activos.</p>
+      ) : (
+        <div className="tx-table-scroll">
+          <table className="tx-table">
+            <thead>
+              <tr>
+                <th>Símbolo</th>
+                <th>Mercado</th>
+                <th>Cantidad</th>
+                <th>Precio compra prom.</th>
+                <th className="tx-amount-header">Invertido</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {holdings.map((h) => (
+                <tr key={`${h.symbol}__${h.market}`}>
+                  <td>{h.symbol}</td>
+                  <td>{MARKET_LABELS[h.market]}</td>
+                  <td>{h.totalQuantity}</td>
+                  <td className="tx-amount">{formatMoney(h.avgBuyPrice, MARKET_CURRENCY[h.market])}</td>
+                  <td className="tx-amount">{formatMoney(h.totalQuantity * h.avgBuyPrice, MARKET_CURRENCY[h.market])}</td>
+                  <td className="tx-actions">
+                    <button type="button" className="gmail-scan-btn" onClick={() => openSell(h)}>
+                      Vender
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      <h3>Movimientos</h3>
+      {movements.length === 0 ? (
+        <p className="empty-state">Todavía no hay movimientos.</p>
+      ) : (
+        <div className="tx-table-scroll">
+          <table className="tx-table">
+            <thead>
+              <tr>
+                <th>Símbolo</th>
+                <th>Fecha compra</th>
+                <th>Cant. compra</th>
+                <th className="tx-amount-header">Valor compra</th>
+                <th>Fecha venta</th>
+                <th>Cant. venta</th>
+                <th className="tx-amount-header">Valor venta</th>
+                <th className="tx-amount-header">Ganancia %</th>
+                <th className="tx-amount-header">Ganancia $/USD</th>
+              </tr>
+            </thead>
+            <tbody>
+              {movements.map((m) => {
+                const currency = MARKET_CURRENCY[m.market]
+                const gainClass = m.gainAmount == null ? '' : m.gainAmount >= 0 ? 'income' : 'negative'
+                return (
+                  <tr key={m.key}>
+                    <td>{m.symbol}</td>
+                    <td>{formatDateShort(m.buyDate)}</td>
+                    <td>{m.buyQuantity}</td>
+                    <td className="tx-amount">{formatMoney(m.buyPrice, currency)}</td>
+                    <td>{m.sellDate ? formatDateShort(m.sellDate) : '—'}</td>
+                    <td>{m.sellQuantity ?? '—'}</td>
+                    <td className="tx-amount">{m.sellPrice != null ? formatMoney(m.sellPrice, currency) : '—'}</td>
+                    <td className={`tx-amount ${gainClass}`}>
+                      {m.gainPct == null ? '—' : `${m.gainPct >= 0 ? '+' : ''}${m.gainPct.toFixed(2)}%`}
+                    </td>
+                    <td className={`tx-amount ${gainClass}`}>
+                      {m.gainAmount == null ? '—' : formatMoney(m.gainAmount, currency)}
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {sellHolding && (
+        <Modal>
+          <h3>Vender {sellHolding.symbol}</h3>
+          <form className="budget-form" onSubmit={handleSell} noValidate>
+            <input
+              type="number"
+              step="any"
+              min="0"
+              max={sellHolding.totalQuantity}
+              placeholder="Cantidad"
+              value={sellQuantity}
+              onChange={(e) => setSellQuantity(e.target.value)}
+            />
+            <input
+              type="number"
+              step="0.01"
+              min="0"
+              placeholder={`Precio de venta (${MARKET_CURRENCY[sellHolding.market]})`}
+              value={sellPrice}
+              onChange={(e) => setSellPrice(e.target.value)}
+            />
+            {sellError && <p className="error">{sellError}</p>}
+            <div className="modal-actions">
+              <button type="button" onClick={() => setSellHolding(null)}>
+                Cancelar
+              </button>
+              <button type="submit" className="primary" disabled={sellSaving}>
+                {sellSaving ? 'Guardando...' : 'Vender'}
+              </button>
+            </div>
+          </form>
+        </Modal>
+      )}
     </div>
   )
 }
