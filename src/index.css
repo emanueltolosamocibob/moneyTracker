@@ -1423,6 +1423,14 @@ input[type='number'] {
   font-size: 1.3rem;
 }
 
+/* Equivalente en pesos de un monto en UVA — más chico y apagado que el
+   monto principal en UVA que acompaña, sin heredar su bold. */
+.loan-card-paid-ars {
+  font-size: 0.75rem;
+  font-weight: 400;
+  color: rgba(255, 255, 255, 0.55);
+}
+
 .loan-progress-row {
   display: flex;
   align-items: center;
