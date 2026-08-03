@@ -1340,6 +1340,92 @@ input[type='number'] {
   flex: 1;
 }
 
+/* --- Préstamos --- */
+
+.loan-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.loan-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 1rem 1.25rem;
+  border-radius: var(--radius);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.06);
+  cursor: pointer;
+}
+
+.loan-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.loan-card-bank {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-weight: 700;
+  font-size: 1.05rem;
+}
+
+.loan-badge-done {
+  padding: 0.15rem 0.5rem;
+  border-radius: var(--radius);
+  background: rgba(74, 222, 128, 0.18);
+  color: var(--income);
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.loan-card-amounts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1.5rem;
+  color: rgba(255, 255, 255, 0.75);
+  font-size: 0.9rem;
+}
+
+.loan-card-amounts strong {
+  font-family: var(--font-mono);
+  color: white;
+}
+
+.loan-progress-row {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.loan-progress {
+  flex: 1;
+  height: 10px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+  overflow: hidden;
+}
+
+.loan-progress-fill {
+  height: 100%;
+  background: var(--income);
+  border-radius: 999px;
+  transition: width 0.2s ease;
+}
+
+.loan-progress-total {
+  flex-shrink: 0;
+  font-family: var(--font-mono);
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.75);
+}
+
 .budget-empty {
   display: flex;
   flex-direction: column;
