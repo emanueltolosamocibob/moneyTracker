@@ -421,7 +421,9 @@ export default function Budgets() {
         <h2>Presupuestos</h2>
         <div className="budget-header-actions">
           <button type="button" className="gmail-scan-btn" onClick={openHistory}>
-            <IconHistory size={14} /> Presupuestos anteriores
+            <IconHistory size={14} />
+            <span className="budget-history-btn-label-full">Presupuestos anteriores</span>
+            <span className="budget-history-btn-label-short">Anteriores</span>
           </button>
           {period && (
             <button type="button" className="gmail-scan-btn" onClick={openEdit}>
