@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabaseClient'
 import { useAuth } from '../lib/AuthContext'
 import type { Category, IncomeSource, PaymentMethod, Transaction, TransactionType } from '../types/database'
@@ -133,7 +134,22 @@ export default function Transactions() {
   // trae de la base solo las transacciones de ese mes (no un fetch general
   // con límite fijo como antes).
   const [selectedMonth, setSelectedMonth] = useState(currentMonthStart)
-  const [categoryFilterId, setCategoryFilterId] = useState('')
+  const [searchParams, setSearchParams] = useSearchParams()
+  // Llega prellenado desde las tarjetas de presupuesto de Budgets.tsx (link
+  // a /transactions?category=<id>) — se lee una sola vez al montar y después
+  // se limpia de la URL para que no quede "pegado" si el usuario navega de
+  // vuelta a esta pestaña por el menú.
+  const [categoryFilterId, setCategoryFilterId] = useState(() => searchParams.get('category') ?? '')
+
+  useEffect(() => {
+    if (searchParams.has('category')) {
+      setSearchParams((prev) => {
+        prev.delete('category')
+        return prev
+      })
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
   // Acordeón del form en mobile (ver media query en index.css): en desktop
   // el form siempre está visible y este estado se ignora vía CSS.
   const [formOpen, setFormOpen] = useState(false)

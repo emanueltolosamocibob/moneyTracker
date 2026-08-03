@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabaseClient'
 import { useAuth } from '../lib/AuthContext'
 import type { BudgetItem, BudgetPeriod, BudgetPeriodType, Category } from '../types/database'
@@ -115,6 +116,7 @@ function BudgetRing({ pct, icon }: { pct: number; icon: ReactNode }) {
 
 export default function Budgets() {
   const { user } = useAuth()
+  const navigate = useNavigate()
   const [categories, setCategories] = useState<Category[]>([])
   const [period, setPeriod] = useState<BudgetPeriod | null>(null)
   const [items, setItems] = useState<BudgetItem[]>([])
@@ -469,9 +471,21 @@ export default function Budgets() {
                 const pct = item.amount > 0 ? (spent / item.amount) * 100 : 0
                 const status = pct >= 100 ? 'over' : pct >= 80 ? 'warn' : ''
                 return (
-                  <div className="budget-card" key={item.id}>
+                  <div
+                    className="budget-card dashboard-card-clickable"
+                    key={item.id}
+                    onClick={() => navigate(`/transactions?category=${item.category_id}`)}
+                    role="button"
+                    tabIndex={0}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') navigate(`/transactions?category=${item.category_id}`)
+                    }}
+                  >
                     <BudgetRing pct={pct} icon={getCategoryIcon(cat?.name, cat?.icon)} />
-                    <strong className={`budget-card-spent ${status}`}>{formatCurrency(spent, 'ARS')}</strong>
+                    <span className="budget-card-spent-row">
+                      <strong className={`budget-card-spent ${status}`}>{formatCurrency(spent, 'ARS')}</strong>
+                      <span className="budget-card-pct">({Math.round(pct)}%)</span>
+                    </span>
                     <span className="budget-card-limit">de {formatCurrency(item.amount, 'ARS')}</span>
                     <span className="budget-card-title">{cat?.name ?? '—'}</span>
                   </div>
