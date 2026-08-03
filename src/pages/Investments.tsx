@@ -5,6 +5,7 @@ import type { InvestmentLot, InvestmentMarket, InvestmentSale } from '../types/d
 import { IconChevronDown, IconPlus, IconX } from '../components/icons'
 import Modal from '../components/Modal'
 import SymbolSearch from '../components/SymbolSearch'
+import DateField from '../components/DateField'
 
 const MARKET_CURRENCY: Record<InvestmentMarket, string> = {
   ar: 'ARS',
@@ -495,7 +496,7 @@ export default function Investments() {
             setSymbolName(name)
           }}
         />
-        <input type="date" value={buyDate} onChange={(e) => setBuyDate(e.target.value)} />
+        <DateField value={buyDate} onChange={setBuyDate} />
         <input
           type="number"
           step="0.01"
@@ -657,7 +658,7 @@ export default function Investments() {
             </p>
           )}
           <form className="budget-form" onSubmit={handleLotEditSubmit} noValidate>
-            <input type="date" value={editLotDate} onChange={(e) => setEditLotDate(e.target.value)} />
+            <DateField value={editLotDate} onChange={setEditLotDate} />
             <input
               type="number"
               step="any"
@@ -699,7 +700,7 @@ export default function Investments() {
         <Modal>
           <h3>Editar venta de {editSale.lot.symbol}</h3>
           <form className="budget-form" onSubmit={handleSaleEditSubmit} noValidate>
-            <input type="date" value={editSaleDate} onChange={(e) => setEditSaleDate(e.target.value)} />
+            <DateField value={editSaleDate} onChange={setEditSaleDate} />
             <input
               type="number"
               step="any"
