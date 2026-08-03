@@ -7,7 +7,6 @@ interface DateFieldProps {
   disabled?: boolean
 }
 
-const MOBILE_QUERY = '(max-width: 720px)'
 const WEEKDAY_LABELS = ['L', 'M', 'X', 'J', 'V', 'S', 'D']
 
 // Mismo motivo que en Transactions.tsx/Budgets.tsx/Investments.tsx: armar
@@ -27,39 +26,14 @@ function mondayIndex(jsDay: number) {
   return (jsDay + 6) % 7
 }
 
-function useIsMobile() {
-  const [isMobile, setIsMobile] = useState(() => window.matchMedia(MOBILE_QUERY).matches)
-  useEffect(() => {
-    const mql = window.matchMedia(MOBILE_QUERY)
-    const handler = (e: MediaQueryListEvent) => setIsMobile(e.matches)
-    mql.addEventListener('change', handler)
-    return () => mql.removeEventListener('change', handler)
-  }, [])
-  return isMobile
-}
-
-// input[type=date] nativo en iOS Safari pinta su contenido interno (los
-// segmentos día/mes/año) más ancho que su propia caja en un viewport
-// angosto, desbordando el form — un bug de renderizado del control nativo
-// que ni font-size ni flex ni overflow:hidden lograron contener de forma
-// confiable (varios intentos, ver historial de commits). En vez de seguir
-// ajustando a ciegas un control que no se puede inspeccionar en un
-// dispositivo real, este componente lo reemplaza por uno propio SOLO en
-// mobile — mismo criterio que Select.tsx/Modal.tsx (reemplazar en vez de
-// pelear con el elemento nativo cuando no se puede controlar su render).
-// En desktop sigue siendo el <input type="date"> de siempre, con su
-// calendario nativo del SO.
+// Reemplaza <input type="date"> en toda la app — arrancó como un fix
+// mobile-only para un bug de renderizado de iOS Safari (el control nativo
+// pintaba sus segmentos día/mes/año más anchos que su propia caja,
+// desbordando el form; ni font-size ni flex ni overflow:hidden lo
+// arreglaron de forma confiable). Confirmado el fix en un iPhone real, se
+// terminó usando también en desktop por consistencia — mismo criterio que
+// Select.tsx/Modal.tsx (control propio en vez de pelear con el nativo).
 export default function DateField({ value, onChange, disabled }: DateFieldProps) {
-  const isMobile = useIsMobile()
-
-  if (!isMobile) {
-    return <input type="date" value={value} disabled={disabled} onChange={(e) => onChange(e.target.value)} />
-  }
-
-  return <CustomDatePicker value={value} onChange={onChange} disabled={disabled} />
-}
-
-function CustomDatePicker({ value, onChange, disabled }: DateFieldProps) {
   const [open, setOpen] = useState(false)
   const [viewDate, setViewDate] = useState(() => (value ? parseDateLocal(value) : new Date()))
   const containerRef = useRef<HTMLDivElement>(null)

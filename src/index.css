@@ -20,12 +20,6 @@ body {
   background: var(--bg);
   color: var(--text);
   font-family: var(--font-heading);
-  /* iOS Safari puede inflar el tamaño de texto de ciertos elementos
-     (form controls incluidos) por encima del font-size declarado en un
-     viewport angosto — eso agravaba el desborde del input[type=date] en
-     mobile, ver el comentario más abajo junto a esas reglas. */
-  -webkit-text-size-adjust: 100%;
-  text-size-adjust: 100%;
 }
 
 /* --- Shared gradient + grain background, used by login and the app shell --- */
@@ -984,36 +978,6 @@ input[type='number'] {
 
 .tx-edit-form input::placeholder {
   color: rgba(255, 255, 255, 0.55);
-}
-
-/* input[type=date] dibuja su valor con el "chrome" nativo del navegador
-   (en iOS Safari, con el mes en letras: "2 ago 2026"), que no respeta
-   font-size igual que un input de texto normal y por eso se ve más grande
-   que el resto de los campos del form. Achicamos lo que sí es controlable
-   (los pseudo-elementos internos en navegadores WebKit/Blink) para
-   acercarlo visualmente al resto — el formato del texto en sí sigue
-   dependiendo del idioma/región del dispositivo, eso no es controlable
-   desde CSS ni JS. */
-.tx-form input[type='date'],
-.tx-edit-form input[type='date'] {
-  font-size: 0.9rem;
-  /* Recorta cualquier desborde a lo Ancho que el propio motor dibuje
-     internamente por encima del border-box del input — en iOS Safari el
-     contenido del control (segmentos día/mes/año) puede pintarse más
-     ancho que la caja aunque el layout de la caja en sí ya esté bien
-     calculado, así que achicar el font-size o el flex-basis no alcanza
-     por sí solo. */
-  overflow: hidden;
-}
-
-.tx-form input[type='date']::-webkit-date-and-time-value,
-.tx-edit-form input[type='date']::-webkit-date-and-time-value {
-  text-align: left;
-}
-
-.tx-form input[type='date']::-webkit-datetime-edit,
-.tx-edit-form input[type='date']::-webkit-datetime-edit {
-  font-size: 0.9rem;
 }
 
 /* Importante: el flex va en un <span> adentro de la celda, nunca en el
