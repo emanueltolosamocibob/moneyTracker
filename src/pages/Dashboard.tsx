@@ -217,6 +217,9 @@ export default function Dashboard() {
   const [chartRows, setChartRows] = useState<CategorySpendRow[]>([])
   const [chartLoading, setChartLoading] = useState(true)
   const [chartError, setChartError] = useState<string | null>(null)
+  // Categoría bajo el mouse (por su `key`, no por índice) — hovering ya sea
+  // la porción o la fila de la leyenda resalta ambas a la vez.
+  const [hoveredChartKey, setHoveredChartKey] = useState<string | null>(null)
 
   // Gráfico de gastos por categoría: mes en curso siempre se recalcula en
   // vivo (y se guarda, quedando "al día" mientras el mes sigue abierto); un
@@ -301,15 +304,38 @@ export default function Dashboard() {
   // amontonarse (el dato sigue estando en la leyenda).
   const PIE_LABEL_MIN_PCT = 6
 
-  const pieGradient = useMemo(() => {
-    if (chartTotal <= 0) return null
+  // Mismo ángulo "desde las 12, en sentido horario" que pieLabels de acá
+  // abajo — 0° apunta arriba, no a la derecha como el seno/coseno de manual.
+  function pointOnCircle(angleDeg: number) {
+    const rad = (angleDeg * Math.PI) / 180
+    return { x: 50 + 50 * Math.sin(rad), y: 50 - 50 * Math.cos(rad) }
+  }
+
+  // Path SVG de una porción de torta (viewBox 0 0 100 100, centro 50,50,
+  // radio 50) — cada porción es su propio <path> en vez de un
+  // conic-gradient único para poder resaltar el borde de una sola al
+  // pasar el mouse (ver dashboard-pie-slice.hovered en index.css).
+  function describeSlice(startDeg: number, endDeg: number) {
+    const start = pointOnCircle(startDeg)
+    const end = pointOnCircle(endDeg)
+    const largeArcFlag = endDeg - startDeg > 180 ? 1 : 0
+    return `M 50 50 L ${start.x} ${start.y} A 50 50 0 ${largeArcFlag} 1 ${end.x} ${end.y} Z`
+  }
+
+  const pieSlices = useMemo(() => {
+    if (chartTotal <= 0) return []
+    // Una sola categoría cubre el 100% — el path de arco de una vuelta
+    // completa degenera (el punto de inicio y fin coinciden), así que ese
+    // caso se dibuja como círculo entero en vez de porción.
+    if (chartRows.length === 1) {
+      return [{ key: chartRows[0].key, color: chartRows[0].color, path: null }]
+    }
     let cursor = 0
-    const stops = chartRows.map((r) => {
+    return chartRows.map((r) => {
       const start = cursor
       cursor += (r.amount / chartTotal) * 360
-      return `${hexToRgba(r.color, PIE_SLICE_ALPHA)} ${start}deg ${cursor}deg`
+      return { key: r.key, color: r.color, path: describeSlice(start, cursor) }
     })
-    return `conic-gradient(${stops.join(', ')})`
   }, [chartRows, chartTotal])
 
   // Posición de cada etiqueta de % sobre el propio círculo — conic-gradient
@@ -661,7 +687,32 @@ export default function Dashboard() {
             ) : (
               <>
                 <div className="dashboard-pie-wrap">
-                  <div className="dashboard-pie" style={{ background: pieGradient ?? undefined }}>
+                  <div className="dashboard-pie">
+                    <svg viewBox="0 0 100 100" className="dashboard-pie-svg">
+                      {pieSlices.map((s) =>
+                        s.path == null ? (
+                          <circle
+                            key={s.key}
+                            cx={50}
+                            cy={50}
+                            r={49}
+                            className={`dashboard-pie-slice${s.key === hoveredChartKey ? ' hovered' : ''}`}
+                            fill={hexToRgba(s.color, PIE_SLICE_ALPHA)}
+                            onMouseEnter={() => setHoveredChartKey(s.key)}
+                            onMouseLeave={() => setHoveredChartKey(null)}
+                          />
+                        ) : (
+                          <path
+                            key={s.key}
+                            d={s.path}
+                            className={`dashboard-pie-slice${s.key === hoveredChartKey ? ' hovered' : ''}`}
+                            fill={hexToRgba(s.color, PIE_SLICE_ALPHA)}
+                            onMouseEnter={() => setHoveredChartKey(s.key)}
+                            onMouseLeave={() => setHoveredChartKey(null)}
+                          />
+                        ),
+                      )}
+                    </svg>
                     {pieLabels.map((l) => (
                       <span
                         key={l.key}
@@ -674,7 +725,12 @@ export default function Dashboard() {
                   </div>
                   <ul className="dashboard-pie-legend">
                     {chartRows.map((r) => (
-                      <li key={r.key} className="dashboard-pie-legend-row">
+                      <li
+                        key={r.key}
+                        className={`dashboard-pie-legend-row${r.key === hoveredChartKey ? ' hovered' : ''}`}
+                        onMouseEnter={() => setHoveredChartKey(r.key)}
+                        onMouseLeave={() => setHoveredChartKey(null)}
+                      >
                         <span className="dashboard-pie-swatch" style={{ background: hexToRgba(r.color, PIE_SLICE_ALPHA) }} />
                         <span className="dashboard-pie-legend-label">{r.label}</span>
                         <span className="tx-amount">{formatCurrency(r.amount, 'ARS')}</span>

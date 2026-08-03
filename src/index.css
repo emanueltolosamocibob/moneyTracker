@@ -2006,9 +2006,31 @@ input[type='number'] {
 .dashboard-pie {
   position: relative;
   flex: 0 0 auto;
-  width: 160px;
-  height: 160px;
+  width: 220px;
+  height: 220px;
   border-radius: 50%;
+}
+
+.dashboard-pie-svg {
+  width: 100%;
+  height: 100%;
+  /* Sin esto, el stroke que dibuja .dashboard-pie-slice.hovered en el
+     borde de una porción tocando el límite del viewBox queda recortado. */
+  overflow: visible;
+}
+
+.dashboard-pie-slice {
+  cursor: pointer;
+  stroke: transparent;
+  stroke-width: 0;
+  transition:
+    stroke-width 0.15s ease,
+    stroke 0.15s ease;
+}
+
+.dashboard-pie-slice.hovered {
+  stroke: white;
+  stroke-width: 2;
 }
 
 /* Etiqueta de % ubicada con left/top calculados en JS (ver pieLabels en
@@ -2077,6 +2099,15 @@ input[type='number'] {
   align-items: center;
   gap: 0.5rem;
   font-size: 0.85rem;
+  padding: 0.15rem 0.3rem;
+  margin: 0 -0.3rem;
+  border-radius: var(--radius);
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+.dashboard-pie-legend-row.hovered {
+  background: rgba(255, 255, 255, 0.09);
 }
 
 .dashboard-pie-swatch {
