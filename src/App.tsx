@@ -4,6 +4,7 @@ import ProtectedRoute from './components/ProtectedRoute'
 import Layout from './components/Layout'
 import Login from './pages/Login'
 import AuthCallback from './pages/AuthCallback'
+import Dashboard from './pages/Dashboard'
 import Transactions from './pages/Transactions'
 import Budgets from './pages/Budgets'
 import Investments from './pages/Investments'
@@ -23,7 +24,8 @@ export default function App() {
             </ProtectedRoute>
           }
         >
-          <Route index element={<Transactions />} />
+          <Route index element={<Dashboard />} />
+          <Route path="transactions" element={<Transactions />} />
           <Route path="budgets" element={<Budgets />} />
           <Route path="investments" element={<Investments />} />
           <Route path="settings" element={<Settings />} />
