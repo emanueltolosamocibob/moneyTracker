@@ -20,6 +20,12 @@ body {
   background: var(--bg);
   color: var(--text);
   font-family: var(--font-heading);
+  /* iOS Safari puede inflar el tamaño de texto de ciertos elementos
+     (form controls incluidos) por encima del font-size declarado en un
+     viewport angosto — eso agravaba el desborde del input[type=date] en
+     mobile, ver el comentario más abajo junto a esas reglas. */
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
 }
 
 /* --- Shared gradient + grain background, used by login and the app shell --- */
@@ -150,8 +156,6 @@ body {
   gap: 2rem;
   padding: 1.25rem 1rem;
   border-right: 1px solid rgba(255, 255, 255, 0.14);
-  background: rgba(10, 8, 40, 0.28);
-  backdrop-filter: blur(14px);
   transition: width 0.2s ease, padding 0.2s ease;
 }
 
@@ -222,8 +226,8 @@ body {
   text-decoration: none;
   padding: 0.6rem 0.75rem;
   border-radius: var(--radius);
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: transparent;
+  border: 1px solid transparent;
 }
 
 .nav-btn svg {
@@ -232,6 +236,7 @@ body {
 
 .nav-btn:hover {
   background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.12);
 }
 
 .nav-btn.active {
@@ -260,8 +265,8 @@ body {
   align-items: center;
   gap: 0.6rem;
   align-self: flex-start;
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: transparent;
+  border: 1px solid transparent;
   color: white;
   border-radius: var(--radius);
   padding: 0.3rem 0.6rem;
@@ -271,6 +276,7 @@ body {
 
 .sidebar-user button:hover {
   background: rgba(255, 255, 255, 0.14);
+  border-color: rgba(255, 255, 255, 0.2);
 }
 
 /* Colapsado: se esconden las etiquetas de texto (con transición) y todo
@@ -921,6 +927,13 @@ input[type='number'] {
 .tx-form input[type='date'],
 .tx-edit-form input[type='date'] {
   font-size: 0.9rem;
+  /* Recorta cualquier desborde a lo Ancho que el propio motor dibuje
+     internamente por encima del border-box del input — en iOS Safari el
+     contenido del control (segmentos día/mes/año) puede pintarse más
+     ancho que la caja aunque el layout de la caja en sí ya esté bien
+     calculado, así que achicar el font-size o el flex-basis no alcanza
+     por sí solo. */
+  overflow: hidden;
 }
 
 .tx-form input[type='date']::-webkit-date-and-time-value,
@@ -2061,6 +2074,17 @@ input[type='number'] {
        amoldarse. flex-shrink:1 deja que se achique hasta el min-width:0
        de arriba en vez de desbordar. */
     flex: 0 1 auto;
+  }
+
+  /* Vuelta a probar en un iPhone real y seguía desbordando incluso con lo
+     de arriba — el font-size de 0.9rem definido más abajo para
+     input[type=date] no alcanzaba con el formato largo de mes en letras
+     de iOS ("3 ago 2026"). Lo bajamos más solo en este breakpoint. */
+  .tx-form input[type='date'],
+  .tx-edit-form input[type='date'] {
+    font-size: 0.8rem;
+    padding-left: 0.4rem;
+    padding-right: 0.4rem;
   }
 
   .type-toggle button {
