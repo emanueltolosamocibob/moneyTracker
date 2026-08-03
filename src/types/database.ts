@@ -14,6 +14,7 @@ export interface Category {
   user_id: string
   name: string
   icon: string | null
+  color: string
   is_default: boolean
   created_at: string
 }
@@ -98,6 +99,20 @@ export interface GmailConnection {
   last_scanned_at: string | null
 }
 
+// "Foto" de lo gastado por categoría en un mes — ver la migración
+// 0008_category_spend_tracking.sql para por qué category_name/category_color
+// se graban como texto plano en vez de resolverse siempre desde `categories`.
+export interface CategoryMonthSpend {
+  id: string
+  user_id: string
+  month_start: string // 'YYYY-MM-DD', siempre el día 1 del mes
+  category_id: string | null
+  category_name: string
+  category_color: string
+  amount: number
+  created_at: string
+}
+
 // Tipado mínimo estilo "Database" de supabase-js. Se puede regenerar con
 // `supabase gen types typescript` una vez creado el proyecto real.
 export interface Database {
@@ -149,6 +164,12 @@ export interface Database {
         Row: GmailConnection
         Insert: Partial<GmailConnection>
         Update: Partial<GmailConnection>
+        Relationships: []
+      }
+      category_month_spend: {
+        Row: CategoryMonthSpend
+        Insert: Partial<CategoryMonthSpend>
+        Update: Partial<CategoryMonthSpend>
         Relationships: []
       }
     }

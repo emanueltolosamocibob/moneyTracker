@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { supabase } from '../lib/supabaseClient'
 import { useAuth } from '../lib/AuthContext'
 import type { Category, IncomeSource, PaymentMethod, Transaction, TransactionType } from '../types/database'
-import { IconChevronDown, IconPencil, IconPlus, IconRefresh, IconX } from '../components/icons'
+import { IconChevronDown, IconPlus, IconRefresh, IconX } from '../components/icons'
 import Select from '../components/Select'
 import Modal from '../components/Modal'
 import { getCategoryIcon } from '../lib/categoryIcons'
@@ -278,6 +278,11 @@ export default function Transactions() {
     }
     setIncomeSources((prev) => [...prev, data].sort((a, b) => a.name.localeCompare(b.name)))
     setIncomeSourceId(data.id)
+  }
+
+  function handleDeleteFromEdit(t: Transaction) {
+    setEditingTx(null)
+    handleDeleteTransaction(t)
   }
 
   function handleDeleteTransaction(t: Transaction) {
@@ -597,14 +602,13 @@ export default function Transactions() {
                 <th>Categoría</th>
                 <th>Medio de pago</th>
                 <th className="tx-amount-header">Monto</th>
-                <th></th>
               </tr>
             </thead>
             <tbody>
               {pagedTransactions.map((t) => {
                 const source = incomeSources.find((s) => s.id === t.income_source_id)
                 return (
-                  <tr key={t.id}>
+                  <tr key={t.id} onDoubleClick={() => openEdit(t)}>
                     <td>{new Date(t.occurred_at).toLocaleDateString('es-AR')}</td>
                     <td className="tx-merchant">
                       {t.needs_review && <span className="review-dot" title="Necesita revisión" />}
@@ -632,24 +636,6 @@ export default function Transactions() {
                     <td className={`tx-amount ${t.type === 'income' ? 'income' : ''}`}>
                       {t.type === 'expense' ? '-' : '+'}
                       {formatCurrency(t.amount, t.currency)}
-                    </td>
-                    <td className="tx-actions">
-                      <button
-                        type="button"
-                        className="tx-edit-btn"
-                        aria-label="Editar transacción"
-                        onClick={() => openEdit(t)}
-                      >
-                        <IconPencil size={14} />
-                      </button>
-                      <button
-                        type="button"
-                        className="tx-delete-btn"
-                        aria-label="Eliminar transacción"
-                        onClick={() => handleDeleteTransaction(t)}
-                      >
-                        <IconX size={14} />
-                      </button>
                     </td>
                   </tr>
                 )
@@ -763,6 +749,13 @@ export default function Transactions() {
               </>
             )}
             <div className="modal-actions">
+              <button
+                type="button"
+                className="danger modal-actions-start"
+                onClick={() => handleDeleteFromEdit(editingTx)}
+              >
+                <IconX size={14} /> Eliminar transacción
+              </button>
               <button type="button" onClick={() => setEditingTx(null)}>
                 Cancelar
               </button>

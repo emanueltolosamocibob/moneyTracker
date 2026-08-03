@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import { useAuth } from '../lib/AuthContext'
 import { supabase } from '../lib/supabaseClient'
-import { IconChevronDown, IconLogout, IconReceipt, IconSettings, IconTrendingUp, IconWallet } from './icons'
+import { IconChevronDown, IconHome, IconLogout, IconReceipt, IconSettings, IconTrendingUp, IconWallet } from './icons'
 
 const COLLAPSE_KEY = 'sidebarCollapsed'
 
@@ -49,6 +49,9 @@ export default function Layout() {
         </div>
         <nav className="sidebar-nav">
           <NavLink to="/" end className="nav-btn">
+            <IconHome /> <span className="nav-label">Inicio</span>
+          </NavLink>
+          <NavLink to="/transactions" className="nav-btn">
             <IconReceipt /> <span className="nav-label">Transacciones</span>
           </NavLink>
           <NavLink to="/budgets" className="nav-btn">
