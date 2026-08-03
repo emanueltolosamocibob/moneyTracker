@@ -660,6 +660,45 @@ input[type='number'] {
   background: transparent;
 }
 
+/* SymbolSearch: panel más ancho que el resto de los Select porque cada
+   opción también puede mostrar el nombre de la compañía (Twelve Data lo
+   trae, ByMA no) — con el min-width normal (100% del input angosto) ese
+   texto quedaba comprimido o cortado enseguida. */
+.symbol-search-panel {
+  min-width: 340px;
+}
+
+.symbol-search-panel li {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.1rem;
+}
+
+.symbol-search-symbol {
+  font-weight: 600;
+}
+
+.symbol-search-name {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.8rem;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+/* Angosta Valor/Cantidad en el form de Inversiones para dejarle más lugar
+   relativo al buscador de símbolo (único lugar de la app con
+   input[type=number] dentro de un .tx-form). Solo desktop: en mobile el
+   form se apila a ancho completo (ver @media más abajo) y esta regla, por
+   ser más específica que esa, lo pisaría si no quedara adentro de su
+   propio min-width. */
+@media (min-width: 721px) {
+  .tx-form input[type='number'] {
+    flex: 0 1 110px;
+  }
+}
+
 .select-option-label {
   flex: 1;
   overflow: hidden;

@@ -1,6 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
 import { supabase } from '../lib/supabaseClient'
 
+interface SymbolMatch {
+  symbol: string
+  name?: string
+}
+
 interface SymbolSearchProps {
   value: string
   onChange: (value: string) => void
@@ -17,10 +22,12 @@ interface SymbolSearchProps {
 // importar la moneda elegida en el toggle) — mismo wrapper .select/.select-panel
 // que Select.tsx para que el dropdown se vea igual, pero con un <input> de
 // texto en vez de un botón-trigger, porque acá el valor se escribe, no se
-// elige de una lista fija.
+// elige de una lista fija. El panel usa una clase propia (más ancho que el
+// resto de los Select) porque acá cada opción también muestra el nombre de
+// la compañía cuando la fuente lo tiene (Twelve Data sí, ByMA no).
 export default function SymbolSearch({ value, onChange, onSelect, placeholder = 'Símbolo' }: SymbolSearchProps) {
   const [open, setOpen] = useState(false)
-  const [options, setOptions] = useState<string[]>([])
+  const [options, setOptions] = useState<SymbolMatch[]>([])
   const [loading, setLoading] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
   const requestIdRef = useRef(0)
@@ -70,7 +77,7 @@ export default function SymbolSearch({ value, onChange, onSelect, placeholder = 
   }, [value])
 
   return (
-    <div className="select" ref={containerRef}>
+    <div className="select symbol-search" ref={containerRef}>
       <input
         type="text"
         placeholder={placeholder}
@@ -83,25 +90,26 @@ export default function SymbolSearch({ value, onChange, onSelect, placeholder = 
         onFocus={() => setOpen(true)}
       />
       {open && value.trim() && (
-        <ul className="select-panel" role="listbox">
+        <ul className="select-panel symbol-search-panel" role="listbox">
           {loading ? (
             <li className="select-panel-status">Buscando...</li>
           ) : options.length === 0 ? (
             <li className="select-panel-status">Sin resultados</li>
           ) : (
-            options.map((sym) => (
+            options.map((opt) => (
               <li
-                key={sym}
+                key={opt.symbol}
                 role="option"
-                aria-selected={sym === value}
-                className={sym === value ? 'active' : undefined}
+                aria-selected={opt.symbol === value}
+                className={opt.symbol === value ? 'active' : undefined}
                 onClick={() => {
-                  onChange(sym)
-                  onSelect(sym)
+                  onChange(opt.symbol)
+                  onSelect(opt.symbol)
                   setOpen(false)
                 }}
               >
-                {sym}
+                <span className="symbol-search-symbol">{opt.symbol}</span>
+                {opt.name && <span className="symbol-search-name">{opt.name}</span>}
               </li>
             ))
           )}
