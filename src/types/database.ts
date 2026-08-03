@@ -140,6 +140,55 @@ export interface GmailConnection {
   last_scanned_at: string | null
 }
 
+// Estado de sincronización del grupo de alertas de Telegram. Los mensajes en
+// sí (telegram_messages) no tienen interfaz acá a propósito: el frontend nunca
+// los lee, solo el análisis derivado — ver api/_lib/telegramSync.ts.
+export interface TelegramSyncState {
+  user_id: string
+  chat_id: string
+  chat_title: string | null
+  last_message_id: number | null
+  backfill_cursor: number | null
+  backfill_done: boolean
+  last_synced_at: string | null
+  created_at: string
+}
+
+export interface TelegramSignalOutcome {
+  entryDate: string
+  entryPrice: number
+  lastDate: string
+  lastPrice: number
+  changePct: number
+  worked: boolean
+}
+
+export interface TelegramSignal {
+  symbol: string
+  action: 'buy' | 'sell' | 'hold'
+  date: string
+  target_price: number | null
+  stop_loss: number | null
+  rationale: string
+  confidence: number
+  in_portfolio: boolean
+  // null cuando no se consiguió serie de precios para el símbolo, o cuando la
+  // señal es 'hold' (no hay entrada que evaluar) — ver api/_lib/priceHistory.ts.
+  outcome: TelegramSignalOutcome | null
+}
+
+export interface TelegramAnalysis {
+  id: string
+  user_id: string
+  chat_id: string
+  from_date: string
+  to_date: string
+  message_count: number
+  summary: string
+  signals: TelegramSignal[]
+  created_at: string
+}
+
 // "Foto" de lo gastado por categoría en un mes — ver la migración
 // 0008_category_spend_tracking.sql para por qué category_name/category_color
 // se graban como texto plano en vez de resolverse siempre desde `categories`.
@@ -229,6 +278,18 @@ export interface Database {
         Row: CategoryMonthSpend
         Insert: Partial<CategoryMonthSpend>
         Update: Partial<CategoryMonthSpend>
+        Relationships: []
+      }
+      telegram_sync_state: {
+        Row: TelegramSyncState
+        Insert: Partial<TelegramSyncState>
+        Update: Partial<TelegramSyncState>
+        Relationships: []
+      }
+      telegram_analyses: {
+        Row: TelegramAnalysis
+        Insert: Partial<TelegramAnalysis>
+        Update: Partial<TelegramAnalysis>
         Relationships: []
       }
     }

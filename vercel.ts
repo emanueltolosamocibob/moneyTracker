@@ -13,5 +13,10 @@ export const config: VercelConfig = {
     // Corre todos los días a las 09:00 UTC (06:00 ART). Si en algún momento
     // se pasa a Pro, se puede volver a algo más frecuente como '*/30 * * * *'.
     { path: '/api/cron/scan-gmail', schedule: '0 9 * * *' },
+    // Alertas de Telegram. A las 10:00 UTC (07:00 ART) y no junto al de
+    // Gmail: los dos abren conexiones lentas hacia afuera y no hay razón
+    // para que compitan. Ojo que el plan Hobby también limita la cantidad de
+    // cron jobs por proyecto — este es el segundo.
+    { path: '/api/cron/sync-telegram', schedule: '0 10 * * *' },
   ],
 }

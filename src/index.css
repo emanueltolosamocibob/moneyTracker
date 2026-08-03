@@ -2227,6 +2227,92 @@ input[type='number'] {
   color: #1a1fb8;
 }
 
+/* Bloque de alertas de Telegram en Inversiones. Reusa .tx-header, .tx-table,
+   .type-toggle y .gmail-scan-btn — acá solo va lo que no existía. */
+.tg-section {
+  margin-top: 2.5rem;
+}
+
+.tg-actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.tg-period {
+  margin: 0.75rem 0;
+}
+
+.tg-meta {
+  color: rgba(255, 255, 255, 0.65);
+  font-size: 0.85rem;
+}
+
+.tg-summary {
+  padding: 1rem;
+  border-radius: var(--radius);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.08);
+  margin-bottom: 1.25rem;
+}
+
+.tg-summary p {
+  margin: 0;
+}
+
+.tg-summary .tg-meta {
+  margin-top: 0.6rem;
+}
+
+/* Compra y venta comparten la escala verde/rojo de ingresos y egresos: en una
+   app de plata ese par ya significa algo, y darle otro color acá sería pedirle
+   al usuario que aprenda una segunda convención. */
+.tg-action-buy {
+  color: var(--income);
+}
+
+.tg-action-sell {
+  color: var(--danger);
+}
+
+.tg-action-hold {
+  color: rgba(255, 255, 255, 0.65);
+}
+
+.tg-hit {
+  color: var(--income);
+}
+
+.tg-miss {
+  color: var(--danger);
+}
+
+.tg-muted {
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.tg-badge {
+  display: inline-block;
+  margin-left: 0.5rem;
+  padding: 0.1rem 0.4rem;
+  border-radius: var(--radius);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.08);
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+/* Las celdas de .tx-table son nowrap (están pensadas para scrollear, no para
+   wrapear), así que el motivo — que es texto libre y puede ser largo — se corta
+   con ellipsis y queda completo en el title. */
+.tg-rationale {
+  max-width: 22rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 /* Mobile: la sidebar pasa de columna lateral fija a una barra superior
    colapsable, para no comerse ancho de pantalla en un viewport angosto. */
 @media (max-width: 720px) {

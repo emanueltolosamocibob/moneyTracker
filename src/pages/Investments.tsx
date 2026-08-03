@@ -6,6 +6,7 @@ import { IconChevronDown, IconPlus, IconX } from '../components/icons'
 import Modal from '../components/Modal'
 import SymbolSearch from '../components/SymbolSearch'
 import DateField from '../components/DateField'
+import TelegramAlerts from '../components/TelegramAlerts'
 
 const MARKET_CURRENCY: Record<InvestmentMarket, string> = {
   ar: 'ARS',
@@ -613,6 +614,8 @@ export default function Investments() {
           </table>
         </div>
       )}
+
+      <TelegramAlerts />
 
       {sellHolding && (
         <Modal>

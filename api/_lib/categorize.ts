@@ -47,7 +47,12 @@ export type ExtractedTransaction = z.infer<typeof extractionSchema>
 const MIN_GEMINI_CALL_INTERVAL_MS = 4_500
 let lastGeminiCallAt = 0
 
-async function throttleGeminiCall() {
+// Exportado para que el análisis de alertas de Telegram
+// (api/telegram/analyze.ts) pase por el mismo freno: la cuota de Gemini es
+// por proyecto, así que un análisis disparado a mano mientras corre un scan
+// de Gmail compite por los mismos RPM. Compartir este estado de módulo es
+// justamente el punto — no sirve que cada archivo tenga su propio contador.
+export async function throttleGeminiCall() {
   const wait = lastGeminiCallAt + MIN_GEMINI_CALL_INTERVAL_MS - Date.now()
   if (wait > 0) await new Promise((resolve) => setTimeout(resolve, wait))
   lastGeminiCallAt = Date.now()
