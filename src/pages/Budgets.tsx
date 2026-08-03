@@ -456,7 +456,10 @@ export default function Budgets() {
             </div>
             <div className="budget-summary-spent">
               <span>Gastado</span>
-              <strong className={`budget-summary-amount ${totalSpentStatus}`}>{formatCurrency(totalSpent, 'ARS')}</strong>
+              <span className="budget-summary-spent-row">
+                <strong className={`budget-summary-amount ${totalSpentStatus}`}>{formatCurrency(totalSpent, 'ARS')}</strong>
+                <span className="budget-summary-pct">({Math.round(totalSpentPct)}%)</span>
+              </span>
             </div>
           </div>
           <p className="budget-period-label">{formatPeriodLabel(period.period_type, period.period_start, period.period_end)}</p>
@@ -482,10 +485,7 @@ export default function Budgets() {
                     }}
                   >
                     <BudgetRing pct={pct} icon={getCategoryIcon(cat?.name, cat?.icon)} />
-                    <span className="budget-card-spent-row">
-                      <strong className={`budget-card-spent ${status}`}>{formatCurrency(spent, 'ARS')}</strong>
-                      <span className="budget-card-pct">({Math.round(pct)}%)</span>
-                    </span>
+                    <strong className={`budget-card-spent ${status}`}>{formatCurrency(spent, 'ARS')}</strong>
                     <span className="budget-card-limit">de {formatCurrency(item.amount, 'ARS')}</span>
                     <span className="budget-card-title">{cat?.name ?? '—'}</span>
                   </div>

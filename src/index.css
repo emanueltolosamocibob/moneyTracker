@@ -587,8 +587,13 @@ input[type='number'] {
   /* A diferencia del trigger, este panel flota sobre contenido (la tabla)
      que no es el fondo con gradiente — con el mismo translúcido de los
      inputs, ese contenido se transparenta y se mezcla con la lista. Blur +
-     un poco más de opacidad lo separan visualmente sin perder el estilo. */
-  background: rgba(40, 32, 110, 0.75);
+     un poco más de opacidad lo separan visualmente sin perder el estilo.
+     El fondo tiene que verse sólido incluso si backdrop-filter no llega a
+     renderizarse (confirmado: en algunos casos el blur queda especificado
+     en el CSS pero no se aplica visualmente, dejando texto de atrás
+     perfectamente legible a través del panel) — por eso la opacidad de
+     base es alta de por sí, no depende del blur para leerse bien. */
+  background: rgba(40, 32, 110, 0.94);
   backdrop-filter: blur(10px);
   color: white;
   box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35);
@@ -1528,6 +1533,21 @@ input[type='number'] {
   color: var(--danger);
 }
 
+.budget-summary-spent-row {
+  display: flex;
+  align-items: baseline;
+  gap: 0.4rem;
+}
+
+/* Más específico que ".budget-summary span" (que le pone 0.65 de opacidad y
+   0.8rem a las etiquetas "Presupuestado"/"Gastado") para que el porcentaje
+   se vea más chico y apagado que esas, no igual. */
+.budget-summary-spent-row .budget-summary-pct {
+  color: rgba(255, 255, 255, 0.45);
+  font-size: 0.85rem;
+  font-family: var(--font-mono);
+}
+
 .budget-period-label {
   margin: 0.25rem 0 1.5rem;
   color: rgba(255, 255, 255, 0.65);
@@ -1585,19 +1605,7 @@ input[type='number'] {
   color: white;
 }
 
-.budget-card-spent-row {
-  display: flex;
-  align-items: baseline;
-  gap: 0.35rem;
-}
-
 .budget-card-spent {
-  font-family: var(--font-mono);
-}
-
-.budget-card-pct {
-  color: rgba(255, 255, 255, 0.55);
-  font-size: 0.78rem;
   font-family: var(--font-mono);
 }
 
@@ -2093,6 +2101,22 @@ input[type='number'] {
    que la de la derecha se saliera de la pantalla. */
 .settings-panel .tx-table {
   min-width: 0;
+}
+
+/* Envuelve Fuentes de ingreso + Bancos como una sola columna del grid, para
+   que Bancos quede debajo de Fuentes en vez de perder su lugar en el
+   auto-flow del grid (que lo mandaría debajo de Categorías). */
+.settings-column {
+  display: flex;
+  flex-direction: column;
+}
+
+/* Mismo separador que .settings-danger-zone más abajo, entre Fuentes de
+   ingreso y Bancos dentro de esa columna. */
+.settings-column > section + section {
+  margin-top: 1.5rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.14);
 }
 
 .settings-panel-header {
