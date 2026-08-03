@@ -1203,6 +1203,10 @@ body {
   flex-wrap: wrap;
 }
 
+.budget-history-btn-label-short {
+  display: none;
+}
+
 /* Ocupa toda la fila (así el modal queda: Eliminar solo arriba, Cancelar +
    Guardar cambios juntos abajo) en vez de compartir fila con los otros dos
    botones empujados a la derecha por margin-right: auto. */
@@ -2009,7 +2013,15 @@ body {
   }
 
   .budget-summary-amount {
-    font-size: 1.4rem;
+    font-size: 2rem;
+  }
+
+  .budget-history-btn-label-full {
+    display: none;
+  }
+
+  .budget-history-btn-label-short {
+    display: inline;
   }
 
   .budget-period-label {
