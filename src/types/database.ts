@@ -74,6 +74,10 @@ export interface InvestmentLot {
   id: string
   user_id: string
   symbol: string
+  // Nombre de la compañía capturado al elegir el símbolo en el buscador —
+  // null cuando vino de ByMA/data912 (no lo trae) o para lotes cargados
+  // antes de que existiera este campo.
+  name: string | null
   market: InvestmentMarket
   buy_date: string // 'YYYY-MM-DD'
   buy_quantity: number

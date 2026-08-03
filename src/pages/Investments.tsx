@@ -31,6 +31,10 @@ interface Holding {
   market: InvestmentMarket
   totalQuantity: number
   avgBuyPrice: number
+  // Nombre de compañía del primer lote que lo tenga — puede haber lotes
+  // viejos sin este dato (ver InvestmentLot.name) aunque sea la misma
+  // tenencia.
+  name: string | null
   // Lotes con remaining_quantity > 0, ordenados FIFO (más viejo primero) —
   // una venta los consume en este orden.
   lots: InvestmentLot[]
@@ -65,6 +69,7 @@ export default function Investments() {
   // SymbolSearch (no de tipear) — bloquea el submit si no hay una elección
   // real, ver handleAdd.
   const [symbolConfirmed, setSymbolConfirmed] = useState(false)
+  const [symbolName, setSymbolName] = useState<string | null>(null)
   const [buyDate, setBuyDate] = useState(todayDateInput())
   const [price, setPrice] = useState('')
   const [quantity, setQuantity] = useState('')
@@ -129,7 +134,7 @@ export default function Investments() {
       const key = `${lot.symbol}__${lot.market}`
       let holding = groups.get(key)
       if (!holding) {
-        holding = { symbol: lot.symbol, market: lot.market, totalQuantity: 0, avgBuyPrice: 0, lots: [] }
+        holding = { symbol: lot.symbol, market: lot.market, totalQuantity: 0, avgBuyPrice: 0, name: null, lots: [] }
         groups.set(key, holding)
       }
       holding.lots.push(lot)
@@ -139,6 +144,7 @@ export default function Investments() {
       holding.lots.sort((a, b) => (a.buy_date < b.buy_date ? -1 : a.buy_date > b.buy_date ? 1 : a.created_at.localeCompare(b.created_at)))
       const totalCost = holding.lots.reduce((sum, l) => sum + l.remaining_quantity * l.buy_price, 0)
       holding.avgBuyPrice = holding.totalQuantity > 0 ? totalCost / holding.totalQuantity : 0
+      holding.name = holding.lots.find((l) => l.name)?.name ?? null
     }
     return Array.from(groups.values()).sort((a, b) => a.symbol.localeCompare(b.symbol))
   }, [lots])
@@ -220,6 +226,7 @@ export default function Investments() {
     const { error: insertError } = await supabase.from('investment_lots').insert({
       user_id: user.id,
       symbol: trimmedSymbol,
+      name: symbolName,
       market,
       buy_date: buyDate,
       buy_quantity: qtyNum,
@@ -235,6 +242,7 @@ export default function Investments() {
 
     setSymbol('')
     setSymbolConfirmed(false)
+    setSymbolName(null)
     setBuyDate(todayDateInput())
     setPrice('')
     setQuantity('')
@@ -482,7 +490,10 @@ export default function Investments() {
             setSymbol(v)
             setSymbolConfirmed(false)
           }}
-          onSelect={() => setSymbolConfirmed(true)}
+          onSelect={(_symbol, name) => {
+            setSymbolConfirmed(true)
+            setSymbolName(name)
+          }}
         />
         <input type="date" value={buyDate} onChange={(e) => setBuyDate(e.target.value)} />
         <input
@@ -527,7 +538,10 @@ export default function Investments() {
             <tbody>
               {holdings.map((h) => (
                 <tr key={`${h.symbol}__${h.market}`} onDoubleClick={() => openLotEdit(h.lots[0], h.lots.length - 1)}>
-                  <td>{h.symbol}</td>
+                  <td>
+                    {h.symbol}
+                    {h.name && <span className="investments-holding-name">{h.name}</span>}
+                  </td>
                   <td>{MARKET_CURRENCY[h.market]}</td>
                   <td>{h.totalQuantity}</td>
                   <td className="tx-amount">{formatMoney(h.avgBuyPrice, MARKET_CURRENCY[h.market])}</td>
@@ -556,10 +570,10 @@ export default function Investments() {
                 <th>Fecha compra</th>
                 <th>Cant. compra</th>
                 <th className="tx-amount-header">Valor compra</th>
-                <th>Fecha venta</th>
+                <th className="tx-table-divider">Fecha venta</th>
                 <th>Cant. venta</th>
                 <th className="tx-amount-header">Valor venta</th>
-                <th className="tx-amount-header">Ganancia %</th>
+                <th className="tx-amount-header tx-table-divider">Ganancia %</th>
                 <th className="tx-amount-header">Ganancia $/USD</th>
               </tr>
             </thead>
@@ -582,10 +596,10 @@ export default function Investments() {
                     <td>{formatDateShort(m.buyDate)}</td>
                     <td>{m.buyQuantity}</td>
                     <td className="tx-amount">{formatMoney(m.buyPrice, currency)}</td>
-                    <td>{m.sellDate ? formatDateShort(m.sellDate) : '—'}</td>
+                    <td className="tx-table-divider">{m.sellDate ? formatDateShort(m.sellDate) : '—'}</td>
                     <td>{m.sellQuantity ?? '—'}</td>
                     <td className="tx-amount">{m.sellPrice != null ? formatMoney(m.sellPrice, currency) : '—'}</td>
-                    <td className={`tx-amount ${gainClass}`}>
+                    <td className={`tx-amount tx-table-divider ${gainClass}`}>
                       {m.gainPct == null ? '—' : `${m.gainPct >= 0 ? '+' : ''}${m.gainPct.toFixed(2)}%`}
                     </td>
                     <td className={`tx-amount ${gainClass}`}>
