@@ -12,7 +12,6 @@ import type {
   Transaction,
 } from '../types/database'
 import { IconReceipt, IconTrendingUp, IconWallet } from '../components/icons'
-import { getCategoryIcon } from '../lib/categoryIcons'
 
 function formatCurrency(amount: number, currency: string) {
   return amount.toLocaleString('es-AR', { style: 'currency', currency })
@@ -93,10 +92,21 @@ function hexToRgba(hex: string, alpha: number) {
 
 const MARKET_CURRENCY: Record<'ar' | 'world', string> = { ar: 'ARS', world: 'USD' }
 
-interface Holding {
-  market: 'ar' | 'world'
-  totalQuantity: number
-  totalCost: number
+// Ganancia realizada — precio de venta menos precio de compra del lote
+// correspondiente, separada por moneda porque sumar ARS y USD directo no
+// significa nada.
+function sumGains(salesList: InvestmentSale[], lots: InvestmentLot[]) {
+  const lotById = new Map(lots.map((l) => [l.id, l]))
+  let ars = 0
+  let usd = 0
+  for (const sale of salesList) {
+    const lot = lotById.get(sale.lot_id)
+    if (!lot) continue
+    const gain = (sale.sell_price - lot.buy_price) * sale.sell_quantity
+    if (MARKET_CURRENCY[lot.market] === 'USD') usd += gain
+    else ars += gain
+  }
+  return { ars, usd }
 }
 
 interface RecentMovement {
@@ -108,7 +118,6 @@ interface RecentMovement {
   currency: string
 }
 
-const RECENT_TX_LIMIT = 5
 const RECENT_MOVEMENTS_LIMIT = 4
 
 // Sentinela para transacciones sin categoría — se graba tal cual en
@@ -186,7 +195,6 @@ export default function Dashboard() {
 
   const [monthTransactions, setMonthTransactions] = useState<Transaction[]>([])
   const [categories, setCategories] = useState<Category[]>([])
-  const [recentTransactions, setRecentTransactions] = useState<Transaction[]>([])
 
   const [budgetPeriod, setBudgetPeriod] = useState<BudgetPeriod | null>(null)
   const [budgetItems, setBudgetItems] = useState<BudgetItem[]>([])
@@ -194,6 +202,16 @@ export default function Dashboard() {
 
   const [lots, setLots] = useState<InvestmentLot[]>([])
   const [sales, setSales] = useState<InvestmentSale[]>([])
+  // Todas las ventas de siempre (no solo las últimas RECENT_MOVEMENTS_LIMIT de
+  // `sales`) — hace falta el total, no una muestra, tanto para la Ganancia
+  // del mes (tarjeta Inversiones) como para el total histórico (tarjeta
+  // Totales); se filtra por mes en JS donde hace falta en vez de pedir dos
+  // veces.
+  const [allSales, setAllSales] = useState<InvestmentSale[]>([])
+  // Todas las transacciones de siempre — para los totales históricos de la
+  // tarjeta "Totales", a diferencia de `monthTransactions` que solo trae el
+  // mes en curso (tarjeta Transacciones).
+  const [allTransactions, setAllTransactions] = useState<Transaction[]>([])
 
   const [chartMonth, setChartMonth] = useState(currentMonthStart)
   const [chartRows, setChartRows] = useState<CategorySpendRow[]>([])
@@ -332,15 +350,16 @@ export default function Dashboard() {
 
       const [
         { data: monthTx, error: monthTxError },
+        { data: allTx },
         { data: cats },
-        { data: recentTx },
         { data: latestPeriod },
         { data: lotsData, error: lotsError },
         { data: salesData },
+        { data: allSalesData },
       ] = await Promise.all([
         supabase.from('transactions').select('*').gte('occurred_at', startISO).lt('occurred_at', endISO),
+        supabase.from('transactions').select('*'),
         supabase.from('categories').select('*'),
-        supabase.from('transactions').select('*').order('occurred_at', { ascending: false }).limit(RECENT_TX_LIMIT),
         supabase.from('budget_periods').select('*').order('period_start', { ascending: false }).limit(1).maybeSingle(),
         supabase.from('investment_lots').select('*').order('buy_date', { ascending: true }),
         supabase
@@ -348,16 +367,18 @@ export default function Dashboard() {
           .select('*')
           .order('sell_date', { ascending: false })
           .limit(RECENT_MOVEMENTS_LIMIT),
+        supabase.from('investment_sales').select('*'),
       ])
 
       if (monthTxError || lotsError) {
         setError(monthTxError?.message ?? lotsError?.message ?? 'Error al cargar el dashboard')
       }
       setMonthTransactions(monthTx ?? [])
+      setAllTransactions(allTx ?? [])
       setCategories(cats ?? [])
-      setRecentTransactions(recentTx ?? [])
       setLots(lotsData ?? [])
       setSales(salesData ?? [])
+      setAllSales(allSalesData ?? [])
 
       // Solo se muestra si el último período todavía está vigente hoy — a
       // diferencia de Budgets.tsx, acá no se genera el siguiente período
@@ -402,23 +423,24 @@ export default function Dashboard() {
     return { income, expense, expenseUSD, net: income - expense, count: monthTransactions.length }
   }, [monthTransactions, categories])
 
+  // Mismo criterio que txTotals pero de todos los tiempos — usado por la
+  // tarjeta "Totales" en vez de la del mes en curso.
+  const allTimeTxTotals = useMemo(() => {
+    const relevant = allTransactions.filter((t) => categories.find((c) => c.id === t.category_id)?.name !== 'Interno')
+    const income = relevant.filter((t) => t.type === 'income').reduce((sum, t) => sum + t.amount, 0)
+    const expense = relevant
+      .filter((t) => t.type === 'expense' && t.currency === 'ARS')
+      .reduce((sum, t) => sum + t.amount, 0)
+    const expenseUSD = relevant
+      .filter((t) => t.type === 'expense' && t.currency === 'USD')
+      .reduce((sum, t) => sum + t.amount, 0)
+    return { income, expense, expenseUSD }
+  }, [allTransactions, categories])
+
   const totalBudgeted = useMemo(() => budgetItems.reduce((sum, it) => sum + it.amount, 0), [budgetItems])
   const totalSpent = useMemo(() => budgetSpent.reduce((sum, t) => sum + t.amount, 0), [budgetSpent])
   const budgetPct = totalBudgeted > 0 ? (totalSpent / totalBudgeted) * 100 : 0
   const budgetStatus = budgetPct >= 100 ? 'over' : budgetPct >= 80 ? 'warn' : ''
-
-  const holdingsByMarket = useMemo(() => {
-    const byMarket: Record<'ar' | 'world', Holding> = {
-      ar: { market: 'ar', totalQuantity: 0, totalCost: 0 },
-      world: { market: 'world', totalQuantity: 0, totalCost: 0 },
-    }
-    for (const lot of lots) {
-      if (lot.remaining_quantity <= 0) continue
-      byMarket[lot.market].totalQuantity += lot.remaining_quantity
-      byMarket[lot.market].totalCost += lot.remaining_quantity * lot.buy_price
-    }
-    return byMarket
-  }, [lots])
 
   const recentMovements = useMemo<RecentMovement[]>(() => {
     const lotById = new Map(lots.map((l) => [l.id, l]))
@@ -453,6 +475,20 @@ export default function Dashboard() {
 
   const hasInvestments = lots.length > 0
 
+  // `monthlyGains` filtra `allSales` al mes en curso (tarjeta Inversiones);
+  // `allTimeGains` no filtra nada (tarjeta Totales).
+  const monthlyGains = useMemo(() => {
+    const { startISO, endISO } = monthRangeISO(currentMonthStart())
+    const monthStartStr = startISO.slice(0, 10)
+    const nextMonthStartStr = endISO.slice(0, 10)
+    return sumGains(
+      allSales.filter((s) => s.sell_date >= monthStartStr && s.sell_date < nextMonthStartStr),
+      lots,
+    )
+  }, [lots, allSales])
+
+  const allTimeGains = useMemo(() => sumGains(allSales, lots), [lots, allSales])
+
   return (
     <div>
       <div className="tx-header">
@@ -481,12 +517,6 @@ export default function Dashboard() {
                 <span>Egresos</span>
                 <strong className="tx-amount dashboard-tx-stat-amount">{formatCurrency(txTotals.expense, 'ARS')}</strong>
               </div>
-              {txTotals.expenseUSD > 0 && (
-                <div className="dashboard-tx-stat-row">
-                  <span>Egresos (USD)</span>
-                  <strong className="tx-amount dashboard-tx-stat-amount">{formatCurrency(txTotals.expenseUSD, 'USD')}</strong>
-                </div>
-              )}
               <div className="dashboard-tx-stat-row">
                 <span>Neto</span>
                 <strong className={`dashboard-tx-stat-amount ${txTotals.net >= 0 ? 'tx-amount income' : 'tx-amount negative'}`}>
@@ -512,14 +542,18 @@ export default function Dashboard() {
                 <p className="dashboard-card-subtitle">
                   {formatPeriodLabel(budgetPeriod.period_start, budgetPeriod.period_end, budgetPeriod.period_type)}
                 </p>
-                <div className="dashboard-stat-row">
-                  <div>
+                <div className="dashboard-tx-stats">
+                  <div className="dashboard-tx-stat-row">
                     <span>Presupuestado</span>
-                    <strong className="dashboard-stat-amount">{formatCurrency(totalBudgeted, 'ARS')}</strong>
+                    <strong className="dashboard-tx-stat-amount">{formatCurrency(totalBudgeted, 'ARS')}</strong>
                   </div>
-                  <div className="dashboard-stat-end">
+                  <div className="dashboard-tx-stat-row">
                     <span>Gastado</span>
-                    <strong className={`dashboard-stat-amount ${budgetStatus}`}>{formatCurrency(totalSpent, 'ARS')}</strong>
+                    <strong className={`dashboard-tx-stat-amount ${budgetStatus}`}>{formatCurrency(totalSpent, 'ARS')}</strong>
+                  </div>
+                  <div className="dashboard-tx-stat-row">
+                    <span>% usado</span>
+                    <strong className={`dashboard-tx-stat-amount ${budgetStatus}`}>{budgetPct.toFixed(0)}%</strong>
                   </div>
                 </div>
               </>
@@ -536,15 +570,17 @@ export default function Dashboard() {
               <p className="empty-state">Todavía no cargaste activos.</p>
             ) : (
               <>
-                <div className="dashboard-stat-row">
-                  <div>
-                    <span>Invertido (ARS)</span>
-                    <strong className="dashboard-stat-amount">{formatCurrency(holdingsByMarket.ar.totalCost, 'ARS')}</strong>
+                <div className="dashboard-tx-stats">
+                  <div className="dashboard-tx-stat-row">
+                    <span>Ganancia</span>
+                    <strong className="dashboard-tx-stat-amount">{formatCurrency(monthlyGains.ars, 'ARS')}</strong>
                   </div>
-                  <div className="dashboard-stat-end">
-                    <span>Invertido (USD)</span>
-                    <strong className="dashboard-stat-amount">{formatCurrency(holdingsByMarket.world.totalCost, 'USD')}</strong>
-                  </div>
+                  {monthlyGains.usd !== 0 && (
+                    <div className="dashboard-tx-stat-row">
+                      <span>Ganancia (USD)</span>
+                      <strong className="dashboard-tx-stat-amount">{formatCurrency(monthlyGains.usd, 'USD')}</strong>
+                    </div>
+                  )}
                 </div>
                 {recentMovements.length > 0 && (
                   <ul className="dashboard-list">
@@ -566,30 +602,37 @@ export default function Dashboard() {
             )}
           </section>
 
-          <section className="dashboard-card dashboard-card-clickable" onDoubleClick={() => navigate('/transactions')}>
+          <section className="dashboard-card">
             <div className="dashboard-card-header">
-              <h3>Últimas transacciones</h3>
+              <h3>Totales</h3>
             </div>
-            {recentTransactions.length === 0 ? (
-              <p className="empty-state">Todavía no hay transacciones.</p>
-            ) : (
-              <ul className="dashboard-list">
-                {recentTransactions.map((t) => {
-                  const cat = categories.find((c) => c.id === t.category_id)
-                  return (
-                    <li key={t.id} className="dashboard-list-row">
-                      <span className="dashboard-list-merchant">
-                        {t.type === 'expense' ? getCategoryIcon(cat?.name, cat?.icon) : null} {t.merchant ?? '—'}
-                      </span>
-                      <span className={t.type === 'income' ? 'tx-amount income' : 'tx-amount'}>
-                        {t.type === 'expense' ? '-' : '+'}
-                        {formatCurrency(t.amount, t.currency)}
-                      </span>
-                    </li>
-                  )
-                })}
-              </ul>
-            )}
+            <p className="dashboard-card-subtitle">De toda la cuenta</p>
+            <div className="dashboard-tx-stats">
+              <div className="dashboard-tx-stat-row">
+                <span>Ingresos</span>
+                <strong className="tx-amount income dashboard-tx-stat-amount">{formatCurrency(allTimeTxTotals.income, 'ARS')}</strong>
+              </div>
+              <div className="dashboard-tx-stat-row">
+                <span>Egresos</span>
+                <strong className="tx-amount dashboard-tx-stat-amount">{formatCurrency(allTimeTxTotals.expense, 'ARS')}</strong>
+              </div>
+              {allTimeTxTotals.expenseUSD > 0 && (
+                <div className="dashboard-tx-stat-row">
+                  <span>Egresos (USD)</span>
+                  <strong className="tx-amount dashboard-tx-stat-amount">{formatCurrency(allTimeTxTotals.expenseUSD, 'USD')}</strong>
+                </div>
+              )}
+              <div className="dashboard-tx-stat-row">
+                <span>Ganancias de inversiones</span>
+                <strong className="dashboard-tx-stat-amount">{formatCurrency(allTimeGains.ars, 'ARS')}</strong>
+              </div>
+              {allTimeGains.usd !== 0 && (
+                <div className="dashboard-tx-stat-row">
+                  <span>Ganancias de inversiones (USD)</span>
+                  <strong className="dashboard-tx-stat-amount">{formatCurrency(allTimeGains.usd, 'USD')}</strong>
+                </div>
+              )}
+            </div>
           </section>
 
           <section className="dashboard-card dashboard-card-chart">

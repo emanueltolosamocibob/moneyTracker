@@ -1608,6 +1608,14 @@ body {
   letter-spacing: 0.01em;
 }
 
+.dashboard-tx-stat-amount.warn {
+  color: var(--warning);
+}
+
+.dashboard-tx-stat-amount.over {
+  color: var(--danger);
+}
+
 .dashboard-card-footnote {
   margin: 0;
   color: rgba(255, 255, 255, 0.65);
