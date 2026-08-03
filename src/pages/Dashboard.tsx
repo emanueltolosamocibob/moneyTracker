@@ -623,12 +623,12 @@ export default function Dashboard() {
                 </div>
               )}
               <div className="dashboard-tx-stat-row">
-                <span>Ganancias de inversiones</span>
+                <span>Inversiones</span>
                 <strong className="dashboard-tx-stat-amount">{formatCurrency(allTimeGains.ars, 'ARS')}</strong>
               </div>
               {allTimeGains.usd !== 0 && (
                 <div className="dashboard-tx-stat-row">
-                  <span>Ganancias de inversiones (USD)</span>
+                  <span>Inversiones (USD)</span>
                   <strong className="dashboard-tx-stat-amount">{formatCurrency(allTimeGains.usd, 'USD')}</strong>
                 </div>
               )}
