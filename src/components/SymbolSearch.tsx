@@ -12,8 +12,9 @@ interface SymbolSearchProps {
   // Se dispara solo cuando el símbolo viene de elegir una opción de la
   // lista (click), nunca por tipear — así el form de arriba puede exigir
   // una elección real antes de dejar agregar (ver handleAdd en
-  // Investments.tsx).
-  onSelect: (value: string) => void
+  // Investments.tsx). Manda el nombre de la compañía también (si la fuente
+  // lo tenía) para que se pueda guardar junto con el lote.
+  onSelect: (value: string, name: string | null) => void
   placeholder?: string
 }
 
@@ -104,7 +105,7 @@ export default function SymbolSearch({ value, onChange, onSelect, placeholder = 
                 className={opt.symbol === value ? 'active' : undefined}
                 onClick={() => {
                   onChange(opt.symbol)
-                  onSelect(opt.symbol)
+                  onSelect(opt.symbol, opt.name ?? null)
                   setOpen(false)
                 }}
               >

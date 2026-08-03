@@ -993,6 +993,22 @@ input[type='number'] {
   text-align: right;
 }
 
+/* Separa visualmente los grupos de columnas de Movimientos en Inversiones
+   (compra / venta / ganancia) con un borde en la primera columna de cada
+   grupo nuevo, en vez de dejarlas todas corridas una al lado de la otra. */
+.tx-table td.tx-table-divider,
+.tx-table th.tx-table-divider {
+  border-left: 1px solid rgba(255, 255, 255, 0.14);
+}
+
+/* Nombre de la compañía junto al símbolo en Cartera actual — atenuado y
+   más chico para no competir visualmente con el ticker. */
+.investments-holding-name {
+  margin-left: 0.5rem;
+  color: rgba(255, 255, 255, 0.55);
+  font-size: 0.85em;
+}
+
 .tx-pagination {
   display: flex;
   align-items: center;
@@ -2036,7 +2052,15 @@ input[type='number'] {
   .type-toggle,
   .tx-form > button {
     width: 100%;
-    flex: 0 0 auto;
+    min-width: 0;
+    /* flex-shrink normalmente en 0 (ver más abajo) — pero con eso el
+       input[type=date] no podía encogerse por debajo de su ancho de
+       contenido intrínseco en iOS Safari (los segmentos día/mes/año +
+       ícono nativo), así que se salía por encima del 100% del form y
+       quedaba cortado por el overflow:hidden de .app-shell en vez de
+       amoldarse. flex-shrink:1 deja que se achique hasta el min-width:0
+       de arriba en vez de desbordar. */
+    flex: 0 1 auto;
   }
 
   .type-toggle button {
