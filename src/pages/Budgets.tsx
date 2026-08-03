@@ -4,6 +4,7 @@ import { useAuth } from '../lib/AuthContext'
 import type { BudgetItem, BudgetPeriod, BudgetPeriodType, Category } from '../types/database'
 import { IconHistory, IconPencil, IconPlus } from '../components/icons'
 import Modal from '../components/Modal'
+import DateField from '../components/DateField'
 import { getCategoryIcon } from '../lib/categoryIcons'
 
 const AUTO_RENEW_MAX_ITERATIONS = 36
@@ -513,9 +514,9 @@ export default function Budgets() {
               </p>
             ) : (
               <div className="budget-custom-range">
-                <input type="date" value={customStart} disabled={editing} onChange={(e) => setCustomStart(e.target.value)} />
+                <DateField value={customStart} disabled={editing} onChange={setCustomStart} />
                 <span>–</span>
-                <input type="date" value={customEnd} disabled={editing} onChange={(e) => setCustomEnd(e.target.value)} />
+                <DateField value={customEnd} disabled={editing} onChange={setCustomEnd} />
               </div>
             )}
 

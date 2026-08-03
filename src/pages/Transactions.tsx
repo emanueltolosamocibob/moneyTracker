@@ -5,6 +5,7 @@ import type { Category, IncomeSource, PaymentMethod, Transaction, TransactionTyp
 import { IconChevronDown, IconPlus, IconRefresh, IconX } from '../components/icons'
 import Select from '../components/Select'
 import Modal from '../components/Modal'
+import DateField from '../components/DateField'
 import { getCategoryIcon } from '../lib/categoryIcons'
 
 const PAYMENT_METHOD_LABELS: Record<PaymentMethod, string> = {
@@ -484,7 +485,7 @@ export default function Transactions() {
             Ingreso
           </button>
         </div>
-        <input type="date" value={occurredAt} onChange={(e) => setOccurredAt(e.target.value)} />
+        <DateField value={occurredAt} onChange={setOccurredAt} />
         <div className="tx-field">
           <input
             type="text"
@@ -687,7 +688,7 @@ export default function Transactions() {
         <Modal>
           <h3>Editar transacción</h3>
           <form className="tx-edit-form" onSubmit={handleEditSubmit} noValidate>
-            <input type="date" value={editOccurredAt} onChange={(e) => setEditOccurredAt(e.target.value)} />
+            <DateField value={editOccurredAt} onChange={setEditOccurredAt} />
             <div className="tx-field">
               <input
                 type="text"
