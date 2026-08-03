@@ -2,13 +2,28 @@ import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { supabase } from '../lib/supabaseClient'
 import { useAuth } from '../lib/AuthContext'
 import type { Bank, Loan, LoanPayment } from '../types/database'
-import { IconChevronDown, IconPlus } from '../components/icons'
+import { IconCheck, IconChevronDown, IconPencil, IconPlus, IconTrash, IconX } from '../components/icons'
 import Modal from '../components/Modal'
 import DateField from '../components/DateField'
 import Select from '../components/Select'
 
 function formatMoney(amount: number) {
   return amount.toLocaleString('es-AR', { style: 'currency', currency: 'ARS', minimumFractionDigits: 2, maximumFractionDigits: 2 })
+}
+
+// Máscara de monto tipo "POS", igual que en Transactions.tsx/Budgets.tsx: el
+// usuario solo tipea dígitos, los últimos dos son siempre los centavos.
+function centsToNumber(digits: string) {
+  return Number(digits || '0') / 100
+}
+
+function formatAmountDigits(digits: string) {
+  if (!digits) return ''
+  return formatMoney(centsToNumber(digits))
+}
+
+function numberToCentsDigits(amount: number) {
+  return Math.round(amount * 100).toString()
 }
 
 function todayDateInput() {
@@ -33,8 +48,8 @@ export default function Loans() {
 
   const [formOpen, setFormOpen] = useState(false)
   const [bankId, setBankId] = useState('')
-  const [amountRequested, setAmountRequested] = useState('')
-  const [amountToRepay, setAmountToRepay] = useState('')
+  const [amountRequestedDigits, setAmountRequestedDigits] = useState('')
+  const [amountToRepayDigits, setAmountToRepayDigits] = useState('')
   const [installmentsCount, setInstallmentsCount] = useState('')
   const [saving, setSaving] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
@@ -43,9 +58,30 @@ export default function Loans() {
 
   const [payLoan, setPayLoan] = useState<Loan | null>(null)
   const [payDate, setPayDate] = useState(todayDateInput())
-  const [payAmount, setPayAmount] = useState('')
+  const [payAmountDigits, setPayAmountDigits] = useState('')
   const [paySaving, setPaySaving] = useState(false)
   const [payError, setPayError] = useState<string | null>(null)
+
+  const [editLoan, setEditLoan] = useState<Loan | null>(null)
+  const [editBankId, setEditBankId] = useState('')
+  const [editAmountRequestedDigits, setEditAmountRequestedDigits] = useState('')
+  const [editAmountToRepayDigits, setEditAmountToRepayDigits] = useState('')
+  const [editInstallmentsCount, setEditInstallmentsCount] = useState('')
+  const [editSaving, setEditSaving] = useState(false)
+  const [editError, setEditError] = useState<string | null>(null)
+
+  const [pendingDeleteLoan, setPendingDeleteLoan] = useState<Loan | null>(null)
+  const [deletingLoan, setDeletingLoan] = useState(false)
+
+  // Cuota (loan_payment) en edición dentro del modal de "Editar préstamo" —
+  // no hay confirmación al borrar una cuota, mismo criterio que el resto de
+  // los registros manuales de la app (solo las transacciones de Gmail piden
+  // confirmar, por lo del re-scan que no las trae de vuelta).
+  const [editingPaymentId, setEditingPaymentId] = useState<string | null>(null)
+  const [editPaymentDate, setEditPaymentDate] = useState('')
+  const [editPaymentAmountDigits, setEditPaymentAmountDigits] = useState('')
+  const [editPaymentSaving, setEditPaymentSaving] = useState(false)
+  const [editPaymentError, setEditPaymentError] = useState<string | null>(null)
 
   async function load() {
     if (!user) return
@@ -107,8 +143,8 @@ export default function Loans() {
     if (!user) return
     setFormError(null)
 
-    const requestedNum = Number(amountRequested)
-    const repayNum = Number(amountToRepay)
+    const requestedNum = centsToNumber(amountRequestedDigits)
+    const repayNum = centsToNumber(amountToRepayDigits)
     const installmentsNum = Number(installmentsCount)
 
     if (!bankId) {
@@ -144,8 +180,8 @@ export default function Loans() {
     }
 
     setBankId('')
-    setAmountRequested('')
-    setAmountToRepay('')
+    setAmountRequestedDigits('')
+    setAmountToRepayDigits('')
     setInstallmentsCount('')
     setFormOpen(false)
     load()
@@ -158,7 +194,7 @@ export default function Loans() {
   function openPay(loan: Loan) {
     setPayLoan(loan)
     setPayDate(todayDateInput())
-    setPayAmount('')
+    setPayAmountDigits('')
     setPayError(null)
   }
 
@@ -167,7 +203,7 @@ export default function Loans() {
     if (!user || !payLoan) return
     setPayError(null)
 
-    const amountNum = Number(payAmount)
+    const amountNum = centsToNumber(payAmountDigits)
     if (!payDate) {
       setPayError('Ingresá una fecha.')
       return
@@ -192,6 +228,130 @@ export default function Loans() {
     }
 
     setPayLoan(null)
+    load()
+  }
+
+  function openEditLoan(loan: Loan) {
+    setEditLoan(loan)
+    setEditBankId(loan.bank_id ?? '')
+    setEditAmountRequestedDigits(numberToCentsDigits(loan.amount_requested))
+    setEditAmountToRepayDigits(numberToCentsDigits(loan.amount_to_repay))
+    setEditInstallmentsCount(String(loan.installments_count))
+    setEditError(null)
+    setEditingPaymentId(null)
+  }
+
+  async function handleEditLoanSubmit(e: FormEvent) {
+    e.preventDefault()
+    if (!editLoan) return
+    setEditError(null)
+
+    const requestedNum = centsToNumber(editAmountRequestedDigits)
+    const repayNum = centsToNumber(editAmountToRepayDigits)
+    const installmentsNum = Number(editInstallmentsCount)
+
+    if (!editBankId) {
+      setEditError('Elegí un banco.')
+      return
+    }
+    if (!(requestedNum > 0)) {
+      setEditError('El monto solicitado tiene que ser mayor a 0.')
+      return
+    }
+    if (!(repayNum > 0)) {
+      setEditError('El monto a devolver tiene que ser mayor a 0.')
+      return
+    }
+    if (!(installmentsNum > 0) || !Number.isInteger(installmentsNum)) {
+      setEditError('La cantidad de cuotas tiene que ser un entero mayor a 0.')
+      return
+    }
+
+    setEditSaving(true)
+    const { error: updateError } = await supabase
+      .from('loans')
+      .update({
+        bank_id: editBankId,
+        amount_requested: requestedNum,
+        amount_to_repay: repayNum,
+        installments_count: installmentsNum,
+      })
+      .eq('id', editLoan.id)
+    setEditSaving(false)
+
+    if (updateError) {
+      setEditError(updateError.message)
+      return
+    }
+
+    setEditLoan(null)
+    load()
+  }
+
+  function handleDeleteLoanClick() {
+    if (!editLoan) return
+    setPendingDeleteLoan(editLoan)
+    setEditLoan(null)
+  }
+
+  async function handleConfirmDeleteLoan() {
+    if (!pendingDeleteLoan) return
+    setDeletingLoan(true)
+    const { error: deleteError } = await supabase.from('loans').delete().eq('id', pendingDeleteLoan.id)
+    setDeletingLoan(false)
+
+    if (deleteError) {
+      setError(deleteError.message)
+      return
+    }
+
+    setPendingDeleteLoan(null)
+    load()
+  }
+
+  function openEditPayment(p: LoanPayment) {
+    setEditingPaymentId(p.id)
+    setEditPaymentDate(p.payment_date)
+    setEditPaymentAmountDigits(numberToCentsDigits(p.amount))
+    setEditPaymentError(null)
+  }
+
+  async function handleEditPaymentSubmit() {
+    if (!editingPaymentId) return
+    setEditPaymentError(null)
+
+    const amountNum = centsToNumber(editPaymentAmountDigits)
+    if (!editPaymentDate) {
+      setEditPaymentError('Ingresá una fecha.')
+      return
+    }
+    if (!(amountNum > 0)) {
+      setEditPaymentError('El monto tiene que ser mayor a 0.')
+      return
+    }
+
+    setEditPaymentSaving(true)
+    const { error: updateError } = await supabase
+      .from('loan_payments')
+      .update({ payment_date: editPaymentDate, amount: amountNum })
+      .eq('id', editingPaymentId)
+    setEditPaymentSaving(false)
+
+    if (updateError) {
+      setEditPaymentError(updateError.message)
+      return
+    }
+
+    setEditingPaymentId(null)
+    load()
+  }
+
+  async function handleDeletePayment(p: LoanPayment) {
+    const { error: deleteError } = await supabase.from('loan_payments').delete().eq('id', p.id)
+    if (deleteError) {
+      setEditPaymentError(deleteError.message)
+      return
+    }
     load()
   }
 
@@ -223,20 +383,20 @@ export default function Loans() {
           createLabel="Agregar banco"
         />
         <input
-          type="number"
-          step="0.01"
-          min="0"
+          type="text"
+          inputMode="numeric"
+          className="amount-input"
           placeholder="Monto solicitado"
-          value={amountRequested}
-          onChange={(e) => setAmountRequested(e.target.value)}
+          value={formatAmountDigits(amountRequestedDigits)}
+          onChange={(e) => setAmountRequestedDigits(e.target.value.replace(/\D/g, '').slice(0, 12))}
         />
         <input
-          type="number"
-          step="0.01"
-          min="0"
+          type="text"
+          inputMode="numeric"
+          className="amount-input"
           placeholder="Monto a devolver"
-          value={amountToRepay}
-          onChange={(e) => setAmountToRepay(e.target.value)}
+          value={formatAmountDigits(amountToRepayDigits)}
+          onChange={(e) => setAmountToRepayDigits(e.target.value.replace(/\D/g, '').slice(0, 12))}
         />
         <input
           type="number"
@@ -286,16 +446,31 @@ export default function Loans() {
                     {bankName}
                     {isFinished && <span className="loan-badge-done">Finalizado</span>}
                   </span>
-                  <button
-                    type="button"
-                    className="gmail-scan-btn"
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      openPay(loan)
-                    }}
-                  >
-                    Registrar pago
-                  </button>
+                  <span className="loan-card-actions">
+                    {!isFinished && (
+                      <button
+                        type="button"
+                        className="gmail-scan-btn"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          openPay(loan)
+                        }}
+                      >
+                        <IconPlus size={14} /> Registrar pago
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      className="tx-edit-btn"
+                      aria-label={`Editar préstamo ${bankName}`}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        openEditLoan(loan)
+                      }}
+                    >
+                      <IconPencil size={14} />
+                    </button>
+                  </span>
                 </div>
                 <div className="loan-card-amounts">
                   <span>
@@ -303,6 +478,9 @@ export default function Loans() {
                   </span>
                   <span>
                     A devolver: <strong>{formatMoney(loan.amount_to_repay)}</strong>
+                  </span>
+                  <span>
+                    Pagado: <strong>{formatMoney(paidAmount)}</strong>
                   </span>
                 </div>
                 <div className="loan-progress-row">
@@ -349,12 +527,12 @@ export default function Loans() {
           <form className="budget-form" onSubmit={handlePaySubmit} noValidate>
             <DateField value={payDate} onChange={setPayDate} />
             <input
-              type="number"
-              step="0.01"
-              min="0"
+              type="text"
+              inputMode="numeric"
+              className="amount-input"
               placeholder="Monto"
-              value={payAmount}
-              onChange={(e) => setPayAmount(e.target.value)}
+              value={formatAmountDigits(payAmountDigits)}
+              onChange={(e) => setPayAmountDigits(e.target.value.replace(/\D/g, '').slice(0, 12))}
             />
             {payError && <p className="error">{payError}</p>}
             <div className="modal-actions">
@@ -366,6 +544,160 @@ export default function Loans() {
               </button>
             </div>
           </form>
+        </Modal>
+      )}
+
+      {editLoan && (
+        <Modal wide>
+          <h3>Editar préstamo</h3>
+          <form className="budget-form" onSubmit={handleEditLoanSubmit} noValidate>
+            <Select
+              value={editBankId}
+              onChange={setEditBankId}
+              placeholder="Banco"
+              options={banks.map((b) => ({ value: b.id, label: b.name }))}
+              onCreate={handleCreateBank}
+              createLabel="Agregar banco"
+            />
+            <input
+              type="text"
+              inputMode="numeric"
+              className="amount-input"
+              placeholder="Monto solicitado"
+              value={formatAmountDigits(editAmountRequestedDigits)}
+              onChange={(e) => setEditAmountRequestedDigits(e.target.value.replace(/\D/g, '').slice(0, 12))}
+            />
+            <input
+              type="text"
+              inputMode="numeric"
+              className="amount-input"
+              placeholder="Monto a devolver"
+              value={formatAmountDigits(editAmountToRepayDigits)}
+              onChange={(e) => setEditAmountToRepayDigits(e.target.value.replace(/\D/g, '').slice(0, 12))}
+            />
+            <input
+              type="number"
+              step="1"
+              min="1"
+              placeholder="Cantidad de cuotas"
+              value={editInstallmentsCount}
+              onChange={(e) => setEditInstallmentsCount(e.target.value)}
+            />
+            {editError && <p className="error">{editError}</p>}
+            <div className="modal-actions">
+              <button type="button" className="danger modal-actions-start" onClick={handleDeleteLoanClick}>
+                Eliminar préstamo
+              </button>
+              <button type="button" onClick={() => setEditLoan(null)}>
+                Cancelar
+              </button>
+              <button type="submit" className="primary" disabled={editSaving}>
+                {editSaving ? 'Guardando...' : 'Guardar cambios'}
+              </button>
+            </div>
+          </form>
+
+          <h4 className="tx-section-heading">Cuotas</h4>
+          {(paymentsByLoan.get(editLoan.id) ?? []).length === 0 ? (
+            <p className="empty-state">Todavía no hay cuotas pagadas.</p>
+          ) : (
+            <div className="tx-table-scroll">
+              <table className="tx-table">
+                <thead>
+                  <tr>
+                    <th>Cuota</th>
+                    <th>Fecha</th>
+                    <th className="tx-amount-header">Monto</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(paymentsByLoan.get(editLoan.id) ?? []).map((p, i) =>
+                    editingPaymentId === p.id ? (
+                      <tr key={p.id}>
+                        <td>{i + 1}</td>
+                        <td>
+                          <DateField value={editPaymentDate} onChange={setEditPaymentDate} />
+                        </td>
+                        <td className="tx-amount">
+                          <input
+                            type="text"
+                            inputMode="numeric"
+                            className="amount-input"
+                            value={formatAmountDigits(editPaymentAmountDigits)}
+                            onChange={(e) => setEditPaymentAmountDigits(e.target.value.replace(/\D/g, '').slice(0, 12))}
+                          />
+                        </td>
+                        <td className="tx-actions">
+                          <button
+                            type="button"
+                            className="tx-edit-btn"
+                            aria-label="Guardar cuota"
+                            disabled={editPaymentSaving}
+                            onClick={handleEditPaymentSubmit}
+                          >
+                            <IconCheck size={14} />
+                          </button>
+                          <button
+                            type="button"
+                            className="tx-delete-btn"
+                            aria-label="Cancelar edición"
+                            onClick={() => setEditingPaymentId(null)}
+                          >
+                            <IconX size={14} />
+                          </button>
+                        </td>
+                      </tr>
+                    ) : (
+                      <tr key={p.id}>
+                        <td>{i + 1}</td>
+                        <td>{formatDateShort(p.payment_date)}</td>
+                        <td className="tx-amount">{formatMoney(p.amount)}</td>
+                        <td className="tx-actions">
+                          <button
+                            type="button"
+                            className="tx-edit-btn"
+                            aria-label={`Editar cuota ${i + 1}`}
+                            onClick={() => openEditPayment(p)}
+                          >
+                            <IconPencil size={14} />
+                          </button>
+                          <button
+                            type="button"
+                            className="tx-delete-btn"
+                            aria-label={`Eliminar cuota ${i + 1}`}
+                            onClick={() => handleDeletePayment(p)}
+                          >
+                            <IconTrash size={14} />
+                          </button>
+                        </td>
+                      </tr>
+                    ),
+                  )}
+                </tbody>
+              </table>
+            </div>
+          )}
+          {editPaymentError && <p className="error">{editPaymentError}</p>}
+        </Modal>
+      )}
+
+      {pendingDeleteLoan && (
+        <Modal>
+          <h3>Eliminar préstamo</h3>
+          <p>
+            Se va a eliminar el préstamo de &quot;
+            {(pendingDeleteLoan.bank_id && bankById.get(pendingDeleteLoan.bank_id)?.name) || 'Sin banco'}&quot; junto con
+            todas sus cuotas registradas. Esta acción no se puede deshacer.
+          </p>
+          <div className="modal-actions">
+            <button type="button" onClick={() => setPendingDeleteLoan(null)}>
+              Cancelar
+            </button>
+            <button type="button" className="danger" disabled={deletingLoan} onClick={handleConfirmDeleteLoan}>
+              {deletingLoan ? 'Eliminando...' : 'Eliminar'}
+            </button>
+          </div>
         </Modal>
       )}
     </div>

@@ -777,6 +777,11 @@ input[type='number'] {
 .date-field-panel {
   width: 260px;
   padding: 0.6rem;
+  /* .select-panel pone max-height:240px + overflow-y:auto pensado para
+     listas de opciones — la grilla del calendario (header + días de semana +
+     hasta 6 filas) no entra ahí y quedaba recortada a mitad de mes. */
+  max-height: none;
+  overflow: visible;
 }
 
 .date-field-header {
@@ -1368,6 +1373,12 @@ input[type='number'] {
   flex-wrap: wrap;
 }
 
+.loan-card-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
 .loan-card-bank {
   display: flex;
   align-items: center;
@@ -1413,10 +1424,26 @@ input[type='number'] {
 }
 
 .loan-progress-fill {
+  position: relative;
   height: 100%;
   background: var(--income);
   border-radius: 999px;
   transition: width 0.2s ease;
+}
+
+/* Mismo grano SVG que .gradient-bg::before/.dashboard-pie::after, para que
+   la barra de progreso comparta la textura del resto de la app en vez de
+   quedar como un fill plano. */
+.loan-progress-fill::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 999px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='1.15' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-size: 90px 90px;
+  opacity: 0.55;
+  mix-blend-mode: overlay;
+  pointer-events: none;
 }
 
 .loan-progress-total {
@@ -1558,7 +1585,19 @@ input[type='number'] {
   color: white;
 }
 
+.budget-card-spent-row {
+  display: flex;
+  align-items: baseline;
+  gap: 0.35rem;
+}
+
 .budget-card-spent {
+  font-family: var(--font-mono);
+}
+
+.budget-card-pct {
+  color: rgba(255, 255, 255, 0.55);
+  font-size: 0.78rem;
   font-family: var(--font-mono);
 }
 
