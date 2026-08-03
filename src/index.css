@@ -217,7 +217,7 @@ body {
 .nav-btn {
   display: flex;
   align-items: center;
-  gap: 0.6rem;
+  gap: 0.85rem;
   color: rgba(255, 255, 255, 0.85);
   text-decoration: none;
   padding: 0.6rem 0.75rem;
@@ -258,7 +258,7 @@ body {
 .sidebar-user button {
   display: inline-flex;
   align-items: center;
-  gap: 0.4rem;
+  gap: 0.6rem;
   align-self: flex-start;
   background: rgba(255, 255, 255, 0.06);
   border: 1px solid rgba(255, 255, 255, 0.2);
@@ -837,6 +837,29 @@ body {
   color: rgba(255, 255, 255, 0.55);
 }
 
+/* input[type=date] dibuja su valor con el "chrome" nativo del navegador
+   (en iOS Safari, con el mes en letras: "2 ago 2026"), que no respeta
+   font-size igual que un input de texto normal y por eso se ve más grande
+   que el resto de los campos del form. Achicamos lo que sí es controlable
+   (los pseudo-elementos internos en navegadores WebKit/Blink) para
+   acercarlo visualmente al resto — el formato del texto en sí sigue
+   dependiendo del idioma/región del dispositivo, eso no es controlable
+   desde CSS ni JS. */
+.tx-form input[type='date'],
+.tx-edit-form input[type='date'] {
+  font-size: 0.9rem;
+}
+
+.tx-form input[type='date']::-webkit-date-and-time-value,
+.tx-edit-form input[type='date']::-webkit-date-and-time-value {
+  text-align: left;
+}
+
+.tx-form input[type='date']::-webkit-datetime-edit,
+.tx-edit-form input[type='date']::-webkit-datetime-edit {
+  font-size: 0.9rem;
+}
+
 /* Importante: el flex va en un <span> adentro de la celda, nunca en el
    <td> directamente — un <td> con display:flex deja de comportarse como
    celda de tabla y descoloca toda la fila. */
@@ -1083,6 +1106,7 @@ body {
   flex-wrap: wrap;
   justify-content: flex-end;
   gap: 0.6rem;
+  margin-top: 0.5rem;
 }
 
 .modal-actions button {
@@ -1105,13 +1129,13 @@ body {
 }
 
 .modal-actions button.danger {
-  background: rgba(255, 107, 107, 0.85);
-  border-color: transparent;
-  color: #2a0a0a;
+  background: rgba(255, 107, 107, 0.16);
+  border-color: rgba(255, 107, 107, 0.4);
+  color: var(--danger);
 }
 
 .modal-actions button.danger:hover {
-  background: rgba(255, 107, 107, 1);
+  background: rgba(255, 107, 107, 0.28);
 }
 
 /* Mismo tratamiento "danger" de .modal-actions button.danger, para botones
@@ -1951,16 +1975,30 @@ body {
     justify-content: flex-end;
   }
 
+  /* En mobile, Gastado va debajo de Presupuestado (en vez de al lado),
+     ambos alineados a la derecha junto al período — más compacto en un
+     viewport angosto que la fila lado a lado de desktop. */
   .budget-summary {
-    justify-content: space-between;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 0.2rem;
+  }
+
+  .budget-summary > div {
+    align-items: flex-end;
+    text-align: right;
   }
 
   .budget-summary-amount {
     font-size: 1.4rem;
   }
 
+  .budget-period-label {
+    text-align: right;
+  }
+
   .budget-grid {
-    grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+    grid-template-columns: repeat(2, 1fr);
   }
 
   .settings-grid {
