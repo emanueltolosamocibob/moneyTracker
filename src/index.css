@@ -633,6 +633,18 @@ body {
   font-weight: 600;
 }
 
+/* Fila informativa (SymbolSearch: "Buscando...", "Sin resultados") — mismo
+   padding que una opción real pero sin hover/click, para no confundirla con
+   una opción elegible. */
+.select-panel li.select-panel-status {
+  cursor: default;
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.select-panel li.select-panel-status:hover {
+  background: transparent;
+}
+
 .select-option-label {
   flex: 1;
   overflow: hidden;
@@ -722,6 +734,13 @@ body {
 
 .tx-form > button:hover {
   background: #f4f4ff;
+}
+
+/* Separación extra antes de un heading que arranca una nueva sección de
+   tabla (hoy: "Movimientos" en Inversiones), sin importar si la sección
+   anterior mostró una tabla o su empty-state. */
+.tx-section-heading {
+  margin-top: 2rem;
 }
 
 .tx-table-scroll {

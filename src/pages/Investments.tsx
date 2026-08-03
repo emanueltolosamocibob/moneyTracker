@@ -4,11 +4,7 @@ import { useAuth } from '../lib/AuthContext'
 import type { InvestmentLot, InvestmentMarket, InvestmentSale } from '../types/database'
 import { IconChevronDown, IconPlus, IconX } from '../components/icons'
 import Modal from '../components/Modal'
-
-const MARKET_LABELS: Record<InvestmentMarket, string> = {
-  ar: 'Acción Argentina',
-  world: 'Acción del mundo',
-}
+import SymbolSearch from '../components/SymbolSearch'
 
 const MARKET_CURRENCY: Record<InvestmentMarket, string> = {
   ar: 'ARS',
@@ -461,15 +457,15 @@ export default function Investments() {
       </button>
 
       <form className={`tx-form${formOpen ? ' open' : ''}`} onSubmit={handleAdd} noValidate>
-        <div className="type-toggle" role="group" aria-label="Tipo de activo">
+        <div className="type-toggle" role="group" aria-label="Moneda">
           <button type="button" className={market === 'ar' ? 'active' : ''} onClick={() => setMarket('ar')}>
-            Acción Argentina
+            ARS
           </button>
           <button type="button" className={market === 'world' ? 'active' : ''} onClick={() => setMarket('world')}>
-            Acción del mundo
+            USD
           </button>
         </div>
-        <input type="text" placeholder="Símbolo" value={symbol} onChange={(e) => setSymbol(e.target.value.toUpperCase())} />
+        <SymbolSearch value={symbol} onChange={setSymbol} market={market} />
         <input
           type="number"
           step="0.01"
@@ -502,7 +498,7 @@ export default function Investments() {
             <thead>
               <tr>
                 <th>Símbolo</th>
-                <th>Mercado</th>
+                <th>Moneda</th>
                 <th>Cantidad</th>
                 <th>Precio compra prom.</th>
                 <th className="tx-amount-header">Invertido</th>
@@ -513,7 +509,7 @@ export default function Investments() {
               {holdings.map((h) => (
                 <tr key={`${h.symbol}__${h.market}`} onDoubleClick={() => openLotEdit(h.lots[0], h.lots.length - 1)}>
                   <td>{h.symbol}</td>
-                  <td>{MARKET_LABELS[h.market]}</td>
+                  <td>{MARKET_CURRENCY[h.market]}</td>
                   <td>{h.totalQuantity}</td>
                   <td className="tx-amount">{formatMoney(h.avgBuyPrice, MARKET_CURRENCY[h.market])}</td>
                   <td className="tx-amount">{formatMoney(h.totalQuantity * h.avgBuyPrice, MARKET_CURRENCY[h.market])}</td>
@@ -529,7 +525,7 @@ export default function Investments() {
         </div>
       )}
 
-      <h3>Movimientos</h3>
+      <h3 className="tx-section-heading">Movimientos</h3>
       {movements.length === 0 ? (
         <p className="empty-state">Todavía no hay movimientos.</p>
       ) : (

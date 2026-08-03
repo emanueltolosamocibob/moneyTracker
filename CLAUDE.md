@@ -100,6 +100,14 @@ All of this lives in the one global `src/index.css` (no CSS modules, no styled-c
 
 **Another one**: `.tx-form`'s direct children are stretched to the tallest sibling's height (default `align-items: stretch`) — but that only grows a *wrapper* div like `.tx-field` or `.select`, not the actual `<input>`/`.select-trigger` inside it, which keeps its own shorter natural height. Any field wrapped in an extra div needs its inner control explicitly sized (`flex: 1` in these cases) to actually fill that stretched space, or it'll sit a couple px shorter than bare siblings like Comercio or the Agregar button.
 
+### Investment symbol search
+
+`src/components/SymbolSearch.tsx` is the "Símbolo" field in Inversiones — same `.select`/`.select-panel` wrapper as `Select.tsx` (so the dropdown looks identical) but with a real `<input>` instead of a button-trigger, since here the value is typed, not picked from a fixed list. It debounces (250ms) and calls `GET /api/investments/symbols?market=ar|world&q=...`, which only ever returns ticker strings — never price.
+
+`api/investments/symbols.ts` is JWT-gated (`getUserIdFromRequest`, same as the Gmail routes) so an anonymous caller can't burn through the Twelve Data quota via this proxy. Two sources, picked per currency:
+- **ARS** (`market=ar`): `https://data912.com/live/arg_stocks` — an unauthenticated public endpoint mirroring ByMA, but with no CORS headers, so it has to be proxied server-side even though it needs no secret.
+- **USD** (`market=world`): Twelve Data's `symbol_search` endpoint, which does need a key — `TWELVE_DATA_API_KEY` in Vercel env vars. Get a free key at https://twelvedata.com (no card required).
+
 ### Mobile layout (< 720px)
 
 Below 720px (see the `@media` block at the end of `src/index.css`), several things change together, all independent of each other's state:
