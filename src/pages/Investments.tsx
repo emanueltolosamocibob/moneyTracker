@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { supabase } from '../lib/supabaseClient'
 import { useAuth } from '../lib/AuthContext'
 import type { InvestmentLot, InvestmentMarket, InvestmentSale } from '../types/database'
-import { IconChevronDown, IconPlus } from '../components/icons'
+import { IconChevronDown, IconPlus, IconX } from '../components/icons'
 import Modal from '../components/Modal'
 
 const MARKET_LABELS: Record<InvestmentMarket, string> = {
@@ -75,6 +75,25 @@ export default function Investments() {
   const [sellPrice, setSellPrice] = useState('')
   const [sellSaving, setSellSaving] = useState(false)
   const [sellError, setSellError] = useState<string | null>(null)
+
+  // Lote (compra) en edición, ya sea desde una fila de Cartera actual o una
+  // fila "abierta" de Movimientos — ambas representan el mismo registro de
+  // investment_lots.
+  const [editLot, setEditLot] = useState<InvestmentLot | null>(null)
+  const [editLotDate, setEditLotDate] = useState('')
+  const [editLotQuantity, setEditLotQuantity] = useState('')
+  const [editLotPrice, setEditLotPrice] = useState('')
+  const [editLotExtraCount, setEditLotExtraCount] = useState(0)
+  const [editLotSaving, setEditLotSaving] = useState(false)
+  const [editLotError, setEditLotError] = useState<string | null>(null)
+
+  // Venta en edición (fila cerrada de Movimientos).
+  const [editSale, setEditSale] = useState<{ sale: InvestmentSale; lot: InvestmentLot } | null>(null)
+  const [editSaleDate, setEditSaleDate] = useState('')
+  const [editSaleQuantity, setEditSaleQuantity] = useState('')
+  const [editSalePrice, setEditSalePrice] = useState('')
+  const [editSaleSaving, setEditSaleSaving] = useState(false)
+  const [editSaleError, setEditSaleError] = useState<string | null>(null)
 
   async function load() {
     if (!user) return
@@ -167,6 +186,8 @@ export default function Investments() {
 
     return rows.sort((a, b) => (a.sortDate < b.sortDate ? 1 : a.sortDate > b.sortDate ? -1 : 0))
   }, [lots, sales])
+
+  const lotById = useMemo(() => new Map(lots.map((l) => [l.id, l])), [lots])
 
   async function handleAdd(e: FormEvent) {
     e.preventDefault()
@@ -286,6 +307,141 @@ export default function Investments() {
     load()
   }
 
+  // Se abre desde una fila de Movimientos (un lote puntual) o desde Cartera
+  // actual — ahí se edita el lote más antiguo de la tenencia; si hay más de
+  // uno, se avisa en el modal para que los demás se editen desde Movimientos.
+  function openLotEdit(lot: InvestmentLot, extraCount = 0) {
+    setEditLot(lot)
+    setEditLotDate(lot.buy_date)
+    setEditLotQuantity(String(lot.remaining_quantity))
+    setEditLotPrice(String(lot.buy_price))
+    setEditLotExtraCount(extraCount)
+    setEditLotError(null)
+  }
+
+  async function handleLotEditSubmit(e: FormEvent) {
+    e.preventDefault()
+    if (!editLot) return
+    setEditLotError(null)
+
+    const qtyNum = Number(editLotQuantity)
+    const priceNum = Number(editLotPrice)
+    if (!(qtyNum > 0)) {
+      setEditLotError('La cantidad tiene que ser mayor a 0.')
+      return
+    }
+    if (!(priceNum > 0)) {
+      setEditLotError('El valor tiene que ser mayor a 0.')
+      return
+    }
+
+    setEditLotSaving(true)
+    const { error: updateError } = await supabase
+      .from('investment_lots')
+      .update({ buy_date: editLotDate, remaining_quantity: qtyNum, buy_price: priceNum })
+      .eq('id', editLot.id)
+    setEditLotSaving(false)
+
+    if (updateError) {
+      setEditLotError(updateError.message)
+      return
+    }
+    setEditLot(null)
+    load()
+  }
+
+  async function handleLotDelete(lot: InvestmentLot) {
+    setEditLotSaving(true)
+    const { error: deleteError } = await supabase.from('investment_lots').delete().eq('id', lot.id)
+    setEditLotSaving(false)
+    if (deleteError) {
+      setEditLotError(deleteError.message)
+      return
+    }
+    setEditLot(null)
+    load()
+  }
+
+  function openSaleEdit(sale: InvestmentSale) {
+    const lot = lotById.get(sale.lot_id)
+    if (!lot) return
+    setEditSale({ sale, lot })
+    setEditSaleDate(sale.sell_date)
+    setEditSaleQuantity(String(sale.sell_quantity))
+    setEditSalePrice(String(sale.sell_price))
+    setEditSaleError(null)
+  }
+
+  async function handleSaleEditSubmit(e: FormEvent) {
+    e.preventDefault()
+    if (!editSale) return
+    setEditSaleError(null)
+
+    const { sale, lot } = editSale
+    const qtyNum = Number(editSaleQuantity)
+    const priceNum = Number(editSalePrice)
+    const maxQty = lot.remaining_quantity + sale.sell_quantity
+
+    if (!(qtyNum > 0)) {
+      setEditSaleError('La cantidad tiene que ser mayor a 0.')
+      return
+    }
+    if (qtyNum > maxQty) {
+      setEditSaleError(`No podés vender más de ${maxQty} unidades de este lote.`)
+      return
+    }
+    if (!(priceNum > 0)) {
+      setEditSaleError('El precio tiene que ser mayor a 0.')
+      return
+    }
+
+    setEditSaleSaving(true)
+    const { error: saleUpdateError } = await supabase
+      .from('investment_sales')
+      .update({ sell_date: editSaleDate, sell_quantity: qtyNum, sell_price: priceNum })
+      .eq('id', sale.id)
+    if (saleUpdateError) {
+      setEditSaleSaving(false)
+      setEditSaleError(saleUpdateError.message)
+      return
+    }
+
+    const { error: lotUpdateError } = await supabase
+      .from('investment_lots')
+      .update({ remaining_quantity: maxQty - qtyNum })
+      .eq('id', lot.id)
+    setEditSaleSaving(false)
+    if (lotUpdateError) {
+      setEditSaleError(lotUpdateError.message)
+      return
+    }
+    setEditSale(null)
+    load()
+  }
+
+  async function handleSaleDelete() {
+    if (!editSale) return
+    const { sale, lot } = editSale
+    setEditSaleSaving(true)
+    const { error: deleteError } = await supabase.from('investment_sales').delete().eq('id', sale.id)
+    if (deleteError) {
+      setEditSaleSaving(false)
+      setEditSaleError(deleteError.message)
+      return
+    }
+    const { error: lotUpdateError } = await supabase
+      .from('investment_lots')
+      .update({ remaining_quantity: lot.remaining_quantity + sale.sell_quantity })
+      .eq('id', lot.id)
+    setEditSaleSaving(false)
+    if (lotUpdateError) {
+      setEditSaleError(lotUpdateError.message)
+      return
+    }
+    setEditSale(null)
+    load()
+  }
+
   return (
     <div>
       <div className="tx-header">
@@ -355,7 +511,7 @@ export default function Investments() {
             </thead>
             <tbody>
               {holdings.map((h) => (
-                <tr key={`${h.symbol}__${h.market}`}>
+                <tr key={`${h.symbol}__${h.market}`} onDoubleClick={() => openLotEdit(h.lots[0], h.lots.length - 1)}>
                   <td>{h.symbol}</td>
                   <td>{MARKET_LABELS[h.market]}</td>
                   <td>{h.totalQuantity}</td>
@@ -396,8 +552,17 @@ export default function Investments() {
               {movements.map((m) => {
                 const currency = MARKET_CURRENCY[m.market]
                 const gainClass = m.gainAmount == null ? '' : m.gainAmount >= 0 ? 'income' : 'negative'
+                const handleRowDoubleClick = () => {
+                  if (m.key.startsWith('sale-')) {
+                    const sale = sales.find((s) => `sale-${s.id}` === m.key)
+                    if (sale) openSaleEdit(sale)
+                  } else {
+                    const lot = lots.find((l) => `open-${l.id}` === m.key)
+                    if (lot) openLotEdit(lot)
+                  }
+                }
                 return (
-                  <tr key={m.key}>
+                  <tr key={m.key} onDoubleClick={handleRowDoubleClick}>
                     <td>{m.symbol}</td>
                     <td>{formatDateShort(m.buyDate)}</td>
                     <td>{m.buyQuantity}</td>
@@ -447,6 +612,96 @@ export default function Investments() {
               </button>
               <button type="submit" className="primary" disabled={sellSaving}>
                 {sellSaving ? 'Guardando...' : 'Vender'}
+              </button>
+            </div>
+          </form>
+        </Modal>
+      )}
+
+      {editLot && (
+        <Modal>
+          <h3>Editar compra de {editLot.symbol}</h3>
+          {editLotExtraCount > 0 && (
+            <p className="empty-state">
+              Esta tenencia tiene {editLotExtraCount + 1} lotes de compra; se está editando el más antiguo ({formatDateShort(editLot.buy_date)}).
+              Para editar los demás, hacé doble click en su fila dentro de Movimientos.
+            </p>
+          )}
+          <form className="budget-form" onSubmit={handleLotEditSubmit} noValidate>
+            <input type="date" value={editLotDate} onChange={(e) => setEditLotDate(e.target.value)} />
+            <input
+              type="number"
+              step="any"
+              min="0"
+              placeholder="Cantidad"
+              value={editLotQuantity}
+              onChange={(e) => setEditLotQuantity(e.target.value)}
+            />
+            <input
+              type="number"
+              step="0.01"
+              min="0"
+              placeholder={`Valor (${MARKET_CURRENCY[editLot.market]})`}
+              value={editLotPrice}
+              onChange={(e) => setEditLotPrice(e.target.value)}
+            />
+            {editLotError && <p className="error">{editLotError}</p>}
+            <div className="modal-actions">
+              <button
+                type="button"
+                className="danger modal-actions-start"
+                onClick={() => handleLotDelete(editLot)}
+                disabled={editLotSaving}
+              >
+                <IconX size={14} /> Eliminar compra
+              </button>
+              <button type="button" onClick={() => setEditLot(null)}>
+                Cancelar
+              </button>
+              <button type="submit" className="primary" disabled={editLotSaving}>
+                {editLotSaving ? 'Guardando...' : 'Guardar cambios'}
+              </button>
+            </div>
+          </form>
+        </Modal>
+      )}
+
+      {editSale && (
+        <Modal>
+          <h3>Editar venta de {editSale.lot.symbol}</h3>
+          <form className="budget-form" onSubmit={handleSaleEditSubmit} noValidate>
+            <input type="date" value={editSaleDate} onChange={(e) => setEditSaleDate(e.target.value)} />
+            <input
+              type="number"
+              step="any"
+              min="0"
+              placeholder="Cantidad"
+              value={editSaleQuantity}
+              onChange={(e) => setEditSaleQuantity(e.target.value)}
+            />
+            <input
+              type="number"
+              step="0.01"
+              min="0"
+              placeholder={`Precio de venta (${MARKET_CURRENCY[editSale.lot.market]})`}
+              value={editSalePrice}
+              onChange={(e) => setEditSalePrice(e.target.value)}
+            />
+            {editSaleError && <p className="error">{editSaleError}</p>}
+            <div className="modal-actions">
+              <button
+                type="button"
+                className="danger modal-actions-start"
+                onClick={handleSaleDelete}
+                disabled={editSaleSaving}
+              >
+                <IconX size={14} /> Eliminar venta
+              </button>
+              <button type="button" onClick={() => setEditSale(null)}>
+                Cancelar
+              </button>
+              <button type="submit" className="primary" disabled={editSaleSaving}>
+                {editSaleSaving ? 'Guardando...' : 'Guardar cambios'}
               </button>
             </div>
           </form>
