@@ -464,14 +464,14 @@ export default function Loans() {
                     )}
                     <button
                       type="button"
-                      className="tx-edit-btn"
+                      className="gmail-scan-btn"
                       aria-label={`Editar préstamo ${bankName}`}
                       onClick={(e) => {
                         e.stopPropagation()
                         openEditLoan(loan)
                       }}
                     >
-                      <IconPencil size={14} />
+                      <IconPencil size={14} /> Editar
                     </button>
                   </span>
                 </div>
@@ -482,13 +482,10 @@ export default function Loans() {
                   <span>
                     Interés: <strong>{formatMoney(loan.amount_to_repay - loan.amount_requested)}</strong>
                   </span>
-                  <span>
-                    Pagado:{' '}
-                    <strong>
-                      {formatMoney(paidAmount)} / {formatMoney(loan.amount_to_repay)}
-                    </strong>
-                  </span>
                 </div>
+                <strong className="loan-card-paid">
+                  {formatMoney(paidAmount)} / {formatMoney(loan.amount_to_repay)}
+                </strong>
                 <div className="loan-progress-row">
                   <div className="loan-progress">
                     <div className="loan-progress-fill" style={{ width: `${progressPct}%` }} />
