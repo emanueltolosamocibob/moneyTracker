@@ -275,101 +275,103 @@ export default function Settings() {
             )}
           </section>
 
-          <section className="settings-panel">
-            <div className="settings-panel-header">
-              <h3>Fuentes de ingreso</h3>
-              <button type="button" className="gmail-scan-btn" onClick={openNewSource}>
-                <IconPlus size={14} /> Agregar
-              </button>
-            </div>
-            {incomeSources.length === 0 ? (
-              <p className="empty-state">Todavía no tenés fuentes de ingreso.</p>
-            ) : (
-              <div className="tx-table-scroll">
-                <table className="tx-table">
-                  <thead>
-                    <tr>
-                      <th>Fuente</th>
-                      <th></th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {incomeSources.map((s) => (
-                      <tr key={s.id}>
-                        <td className="tx-merchant">{s.name}</td>
-                        <td className="tx-actions">
-                          <button
-                            type="button"
-                            className="tx-edit-btn"
-                            aria-label={`Editar ${s.name}`}
-                            onClick={() => openEditSource(s)}
-                          >
-                            <IconPencil size={14} />
-                          </button>
-                          <button
-                            type="button"
-                            className="tx-delete-btn"
-                            aria-label={`Eliminar ${s.name}`}
-                            onClick={() => setPendingDelete({ kind: 'income_source', id: s.id, name: s.name })}
-                          >
-                            <IconTrash size={14} />
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+          <div className="settings-column">
+            <section className="settings-panel">
+              <div className="settings-panel-header">
+                <h3>Fuentes de ingreso</h3>
+                <button type="button" className="gmail-scan-btn" onClick={openNewSource}>
+                  <IconPlus size={14} /> Agregar
+                </button>
               </div>
-            )}
-          </section>
+              {incomeSources.length === 0 ? (
+                <p className="empty-state">Todavía no tenés fuentes de ingreso.</p>
+              ) : (
+                <div className="tx-table-scroll">
+                  <table className="tx-table">
+                    <thead>
+                      <tr>
+                        <th>Fuente</th>
+                        <th></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {incomeSources.map((s) => (
+                        <tr key={s.id}>
+                          <td className="tx-merchant">{s.name}</td>
+                          <td className="tx-actions">
+                            <button
+                              type="button"
+                              className="tx-edit-btn"
+                              aria-label={`Editar ${s.name}`}
+                              onClick={() => openEditSource(s)}
+                            >
+                              <IconPencil size={14} />
+                            </button>
+                            <button
+                              type="button"
+                              className="tx-delete-btn"
+                              aria-label={`Eliminar ${s.name}`}
+                              onClick={() => setPendingDelete({ kind: 'income_source', id: s.id, name: s.name })}
+                            >
+                              <IconTrash size={14} />
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </section>
 
-          <section className="settings-panel">
-            <div className="settings-panel-header">
-              <h3>Bancos</h3>
-              <button type="button" className="gmail-scan-btn" onClick={openNewBank}>
-                <IconPlus size={14} /> Agregar
-              </button>
-            </div>
-            {banks.length === 0 ? (
-              <p className="empty-state">Todavía no tenés bancos cargados.</p>
-            ) : (
-              <div className="tx-table-scroll">
-                <table className="tx-table">
-                  <thead>
-                    <tr>
-                      <th>Banco</th>
-                      <th></th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {banks.map((b) => (
-                      <tr key={b.id}>
-                        <td className="tx-merchant">{b.name}</td>
-                        <td className="tx-actions">
-                          <button
-                            type="button"
-                            className="tx-edit-btn"
-                            aria-label={`Editar ${b.name}`}
-                            onClick={() => openEditBank(b)}
-                          >
-                            <IconPencil size={14} />
-                          </button>
-                          <button
-                            type="button"
-                            className="tx-delete-btn"
-                            aria-label={`Eliminar ${b.name}`}
-                            onClick={() => setPendingDelete({ kind: 'bank', id: b.id, name: b.name })}
-                          >
-                            <IconTrash size={14} />
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+            <section className="settings-panel">
+              <div className="settings-panel-header">
+                <h3>Bancos</h3>
+                <button type="button" className="gmail-scan-btn" onClick={openNewBank}>
+                  <IconPlus size={14} /> Agregar
+                </button>
               </div>
-            )}
-          </section>
+              {banks.length === 0 ? (
+                <p className="empty-state">Todavía no tenés bancos cargados.</p>
+              ) : (
+                <div className="tx-table-scroll">
+                  <table className="tx-table">
+                    <thead>
+                      <tr>
+                        <th>Banco</th>
+                        <th></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {banks.map((b) => (
+                        <tr key={b.id}>
+                          <td className="tx-merchant">{b.name}</td>
+                          <td className="tx-actions">
+                            <button
+                              type="button"
+                              className="tx-edit-btn"
+                              aria-label={`Editar ${b.name}`}
+                              onClick={() => openEditBank(b)}
+                            >
+                              <IconPencil size={14} />
+                            </button>
+                            <button
+                              type="button"
+                              className="tx-delete-btn"
+                              aria-label={`Eliminar ${b.name}`}
+                              onClick={() => setPendingDelete({ kind: 'bank', id: b.id, name: b.name })}
+                            >
+                              <IconTrash size={14} />
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </section>
+          </div>
         </div>
       )}
 

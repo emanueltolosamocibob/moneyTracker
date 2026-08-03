@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { supabase } from '../lib/supabaseClient'
 import { useAuth } from '../lib/AuthContext'
 import type { Bank, Loan, LoanPayment } from '../types/database'
-import { IconCheck, IconChevronDown, IconPencil, IconPlus, IconTrash, IconX } from '../components/icons'
+import { IconChevronDown, IconPencil, IconPlus } from '../components/icons'
 import Modal from '../components/Modal'
 import DateField from '../components/DateField'
 import Select from '../components/Select'
@@ -73,11 +73,13 @@ export default function Loans() {
   const [pendingDeleteLoan, setPendingDeleteLoan] = useState<Loan | null>(null)
   const [deletingLoan, setDeletingLoan] = useState(false)
 
-  // Cuota (loan_payment) en edición dentro del modal de "Editar préstamo" —
-  // no hay confirmación al borrar una cuota, mismo criterio que el resto de
-  // los registros manuales de la app (solo las transacciones de Gmail piden
+  // Cuota (loan_payment) en edición — se abre con doble click sobre su fila
+  // en la tabla de cuotas del desplegable de la tarjeta (mismo gesto que
+  // Transactions.tsx usa para abrir el editor de una transacción). No hay
+  // confirmación al borrar una cuota, mismo criterio que el resto de los
+  // registros manuales de la app (solo las transacciones de Gmail piden
   // confirmar, por lo del re-scan que no las trae de vuelta).
-  const [editingPaymentId, setEditingPaymentId] = useState<string | null>(null)
+  const [editingPayment, setEditingPayment] = useState<LoanPayment | null>(null)
   const [editPaymentDate, setEditPaymentDate] = useState('')
   const [editPaymentAmountDigits, setEditPaymentAmountDigits] = useState('')
   const [editPaymentSaving, setEditPaymentSaving] = useState(false)
@@ -238,7 +240,6 @@ export default function Loans() {
     setEditAmountToRepayDigits(numberToCentsDigits(loan.amount_to_repay))
     setEditInstallmentsCount(String(loan.installments_count))
     setEditError(null)
-    setEditingPaymentId(null)
   }
 
   async function handleEditLoanSubmit(e: FormEvent) {
@@ -310,14 +311,15 @@ export default function Loans() {
   }
 
   function openEditPayment(p: LoanPayment) {
-    setEditingPaymentId(p.id)
+    setEditingPayment(p)
     setEditPaymentDate(p.payment_date)
     setEditPaymentAmountDigits(numberToCentsDigits(p.amount))
     setEditPaymentError(null)
   }
 
-  async function handleEditPaymentSubmit() {
-    if (!editingPaymentId) return
+  async function handleEditPaymentSubmit(e: FormEvent) {
+    e.preventDefault()
+    if (!editingPayment) return
     setEditPaymentError(null)
 
     const amountNum = centsToNumber(editPaymentAmountDigits)
@@ -334,7 +336,7 @@ export default function Loans() {
     const { error: updateError } = await supabase
       .from('loan_payments')
       .update({ payment_date: editPaymentDate, amount: amountNum })
-      .eq('id', editingPaymentId)
+      .eq('id', editingPayment.id)
     setEditPaymentSaving(false)
 
     if (updateError) {
@@ -342,7 +344,7 @@ export default function Loans() {
       return
     }
 
-    setEditingPaymentId(null)
+    setEditingPayment(null)
     load()
   }
 
@@ -352,6 +354,7 @@ export default function Loans() {
       setEditPaymentError(deleteError.message)
       return
     }
+    setEditingPayment(null)
     load()
   }
 
@@ -402,7 +405,7 @@ export default function Loans() {
           type="number"
           step="1"
           min="1"
-          placeholder="Cantidad de cuotas"
+          placeholder="Cuotas"
           value={installmentsCount}
           onChange={(e) => setInstallmentsCount(e.target.value)}
         />
@@ -477,10 +480,13 @@ export default function Loans() {
                     Solicitado: <strong>{formatMoney(loan.amount_requested)}</strong>
                   </span>
                   <span>
-                    A devolver: <strong>{formatMoney(loan.amount_to_repay)}</strong>
+                    Interés: <strong>{formatMoney(loan.amount_to_repay - loan.amount_requested)}</strong>
                   </span>
                   <span>
-                    Pagado: <strong>{formatMoney(paidAmount)}</strong>
+                    Pagado:{' '}
+                    <strong>
+                      {formatMoney(paidAmount)} / {formatMoney(loan.amount_to_repay)}
+                    </strong>
                   </span>
                 </div>
                 <div className="loan-progress-row">
@@ -504,7 +510,13 @@ export default function Loans() {
                         </thead>
                         <tbody>
                           {loanPayments.map((p, i) => (
-                            <tr key={p.id}>
+                            <tr
+                              key={p.id}
+                              onDoubleClick={(e) => {
+                                e.stopPropagation()
+                                openEditPayment(p)
+                              }}
+                            >
                               <td>{i + 1}</td>
                               <td>{formatDateShort(p.payment_date)}</td>
                               <td className="tx-amount">{formatMoney(p.amount)}</td>
@@ -548,7 +560,7 @@ export default function Loans() {
       )}
 
       {editLoan && (
-        <Modal wide>
+        <Modal>
           <h3>Editar préstamo</h3>
           <form className="budget-form" onSubmit={handleEditLoanSubmit} noValidate>
             <Select
@@ -579,7 +591,7 @@ export default function Loans() {
               type="number"
               step="1"
               min="1"
-              placeholder="Cantidad de cuotas"
+              placeholder="Cuotas"
               value={editInstallmentsCount}
               onChange={(e) => setEditInstallmentsCount(e.target.value)}
             />
@@ -596,89 +608,39 @@ export default function Loans() {
               </button>
             </div>
           </form>
+        </Modal>
+      )}
 
-          <h4 className="tx-section-heading">Cuotas</h4>
-          {(paymentsByLoan.get(editLoan.id) ?? []).length === 0 ? (
-            <p className="empty-state">Todavía no hay cuotas pagadas.</p>
-          ) : (
-            <div className="tx-table-scroll">
-              <table className="tx-table">
-                <thead>
-                  <tr>
-                    <th>Cuota</th>
-                    <th>Fecha</th>
-                    <th className="tx-amount-header">Monto</th>
-                    <th></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {(paymentsByLoan.get(editLoan.id) ?? []).map((p, i) =>
-                    editingPaymentId === p.id ? (
-                      <tr key={p.id}>
-                        <td>{i + 1}</td>
-                        <td>
-                          <DateField value={editPaymentDate} onChange={setEditPaymentDate} />
-                        </td>
-                        <td className="tx-amount">
-                          <input
-                            type="text"
-                            inputMode="numeric"
-                            className="amount-input"
-                            value={formatAmountDigits(editPaymentAmountDigits)}
-                            onChange={(e) => setEditPaymentAmountDigits(e.target.value.replace(/\D/g, '').slice(0, 12))}
-                          />
-                        </td>
-                        <td className="tx-actions">
-                          <button
-                            type="button"
-                            className="tx-edit-btn"
-                            aria-label="Guardar cuota"
-                            disabled={editPaymentSaving}
-                            onClick={handleEditPaymentSubmit}
-                          >
-                            <IconCheck size={14} />
-                          </button>
-                          <button
-                            type="button"
-                            className="tx-delete-btn"
-                            aria-label="Cancelar edición"
-                            onClick={() => setEditingPaymentId(null)}
-                          >
-                            <IconX size={14} />
-                          </button>
-                        </td>
-                      </tr>
-                    ) : (
-                      <tr key={p.id}>
-                        <td>{i + 1}</td>
-                        <td>{formatDateShort(p.payment_date)}</td>
-                        <td className="tx-amount">{formatMoney(p.amount)}</td>
-                        <td className="tx-actions">
-                          <button
-                            type="button"
-                            className="tx-edit-btn"
-                            aria-label={`Editar cuota ${i + 1}`}
-                            onClick={() => openEditPayment(p)}
-                          >
-                            <IconPencil size={14} />
-                          </button>
-                          <button
-                            type="button"
-                            className="tx-delete-btn"
-                            aria-label={`Eliminar cuota ${i + 1}`}
-                            onClick={() => handleDeletePayment(p)}
-                          >
-                            <IconTrash size={14} />
-                          </button>
-                        </td>
-                      </tr>
-                    ),
-                  )}
-                </tbody>
-              </table>
+      {editingPayment && (
+        <Modal>
+          <h3>Editar cuota</h3>
+          <form className="budget-form" onSubmit={handleEditPaymentSubmit} noValidate>
+            <DateField value={editPaymentDate} onChange={setEditPaymentDate} />
+            <input
+              type="text"
+              inputMode="numeric"
+              className="amount-input"
+              placeholder="Monto"
+              value={formatAmountDigits(editPaymentAmountDigits)}
+              onChange={(e) => setEditPaymentAmountDigits(e.target.value.replace(/\D/g, '').slice(0, 12))}
+            />
+            {editPaymentError && <p className="error">{editPaymentError}</p>}
+            <div className="modal-actions">
+              <button
+                type="button"
+                className="danger modal-actions-start"
+                onClick={() => handleDeletePayment(editingPayment)}
+              >
+                Eliminar cuota
+              </button>
+              <button type="button" onClick={() => setEditingPayment(null)}>
+                Cancelar
+              </button>
+              <button type="submit" className="primary" disabled={editPaymentSaving}>
+                {editPaymentSaving ? 'Guardando...' : 'Guardar cambios'}
+              </button>
             </div>
-          )}
-          {editPaymentError && <p className="error">{editPaymentError}</p>}
+          </form>
         </Modal>
       )}
 
