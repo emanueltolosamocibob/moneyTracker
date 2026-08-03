@@ -96,6 +96,25 @@ export interface InvestmentSale {
   created_at: string
 }
 
+export interface Loan {
+  id: string
+  user_id: string
+  bank: string
+  amount_requested: number
+  amount_to_repay: number
+  installments_count: number
+  created_at: string
+}
+
+export interface LoanPayment {
+  id: string
+  user_id: string
+  loan_id: string
+  payment_date: string // 'YYYY-MM-DD'
+  amount: number
+  created_at: string
+}
+
 export interface GmailConnection {
   user_id: string
   email: string
@@ -162,6 +181,18 @@ export interface Database {
         Row: InvestmentSale
         Insert: Partial<InvestmentSale>
         Update: Partial<InvestmentSale>
+        Relationships: []
+      }
+      loans: {
+        Row: Loan
+        Insert: Partial<Loan>
+        Update: Partial<Loan>
+        Relationships: []
+      }
+      loan_payments: {
+        Row: LoanPayment
+        Insert: Partial<LoanPayment>
+        Update: Partial<LoanPayment>
         Relationships: []
       }
       gmail_connections: {
