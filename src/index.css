@@ -1414,6 +1414,15 @@ input[type='number'] {
   color: white;
 }
 
+/* Pagado-vs-a-devolver: sin etiqueta ("Pagado:") a diferencia de
+   Solicitado/Interés, y más grande — es el dato que más importa de un
+   vistazo en la tarjeta. */
+.loan-card-paid {
+  font-family: var(--font-mono);
+  color: white;
+  font-size: 1.3rem;
+}
+
 .loan-progress-row {
   display: flex;
   align-items: center;
@@ -1519,10 +1528,15 @@ input[type='number'] {
   font-size: 0.8rem;
 }
 
+/* color explícito porque vive dentro de .budget-summary-spent-row, un
+   <span> — sin esto, ".budget-summary span" (pensado para las etiquetas
+   "Presupuestado"/"Gastado") le pisa el color al monto con el mismo 0.65 de
+   opacidad apagada que el porcentaje. */
 .budget-summary-amount {
   font-family: var(--font-mono);
   font-size: 2rem;
   letter-spacing: 0.01em;
+  color: var(--text);
 }
 
 .budget-summary-amount.warn {
