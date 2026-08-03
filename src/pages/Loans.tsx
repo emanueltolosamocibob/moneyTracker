@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { supabase } from '../lib/supabaseClient'
 import { useAuth } from '../lib/AuthContext'
-import type { Loan, LoanPayment } from '../types/database'
+import type { Bank, Loan, LoanPayment } from '../types/database'
 import { IconChevronDown, IconPlus } from '../components/icons'
 import Modal from '../components/Modal'
 import DateField from '../components/DateField'
+import Select from '../components/Select'
 
 function formatMoney(amount: number) {
   return amount.toLocaleString('es-AR', { style: 'currency', currency: 'ARS', minimumFractionDigits: 2, maximumFractionDigits: 2 })
@@ -26,11 +27,12 @@ export default function Loans() {
   const { user } = useAuth()
   const [loans, setLoans] = useState<Loan[]>([])
   const [payments, setPayments] = useState<LoanPayment[]>([])
+  const [banks, setBanks] = useState<Bank[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
   const [formOpen, setFormOpen] = useState(false)
-  const [bank, setBank] = useState('')
+  const [bankId, setBankId] = useState('')
   const [amountRequested, setAmountRequested] = useState('')
   const [amountToRepay, setAmountToRepay] = useState('')
   const [installmentsCount, setInstallmentsCount] = useState('')
@@ -50,19 +52,25 @@ export default function Loans() {
     setLoading(true)
     setError(null)
 
-    const [{ data: loansData, error: loansError }, { data: paymentsData, error: paymentsError }] = await Promise.all([
+    const [
+      { data: loansData, error: loansError },
+      { data: paymentsData, error: paymentsError },
+      { data: banksData, error: banksError },
+    ] = await Promise.all([
       supabase.from('loans').select('*').order('created_at', { ascending: false }),
       supabase.from('loan_payments').select('*').order('payment_date', { ascending: true }),
+      supabase.from('banks').select('*').order('name'),
     ])
 
-    if (loansError || paymentsError) {
-      setError(loansError?.message ?? paymentsError?.message ?? 'Error al cargar préstamos')
+    if (loansError || paymentsError || banksError) {
+      setError(loansError?.message ?? paymentsError?.message ?? banksError?.message ?? 'Error al cargar préstamos')
       setLoading(false)
       return
     }
 
     setLoans(loansData ?? [])
     setPayments(paymentsData ?? [])
+    setBanks(banksData ?? [])
     setLoading(false)
   }
 
@@ -81,18 +89,30 @@ export default function Loans() {
     return map
   }, [payments])
 
+  const bankById = useMemo(() => new Map(banks.map((b) => [b.id, b])), [banks])
+
+  async function handleCreateBank(name: string) {
+    if (!user) return
+    const { data, error: insertError } = await supabase.from('banks').insert({ user_id: user.id, name }).select().single()
+    if (insertError || !data) {
+      setFormError(insertError?.message ?? 'No se pudo crear el banco')
+      return
+    }
+    setBanks((prev) => [...prev, data].sort((a, b) => a.name.localeCompare(b.name)))
+    setBankId(data.id)
+  }
+
   async function handleAdd(e: FormEvent) {
     e.preventDefault()
     if (!user) return
     setFormError(null)
 
-    const trimmedBank = bank.trim()
     const requestedNum = Number(amountRequested)
     const repayNum = Number(amountToRepay)
     const installmentsNum = Number(installmentsCount)
 
-    if (!trimmedBank) {
-      setFormError('Ingresá el banco.')
+    if (!bankId) {
+      setFormError('Elegí un banco.')
       return
     }
     if (!(requestedNum > 0)) {
@@ -111,7 +131,7 @@ export default function Loans() {
     setSaving(true)
     const { error: insertError } = await supabase.from('loans').insert({
       user_id: user.id,
-      bank: trimmedBank,
+      bank_id: bankId,
       amount_requested: requestedNum,
       amount_to_repay: repayNum,
       installments_count: installmentsNum,
@@ -123,7 +143,7 @@ export default function Loans() {
       return
     }
 
-    setBank('')
+    setBankId('')
     setAmountRequested('')
     setAmountToRepay('')
     setInstallmentsCount('')
@@ -194,7 +214,14 @@ export default function Loans() {
       </button>
 
       <form className={`tx-form${formOpen ? ' open' : ''}`} onSubmit={handleAdd} noValidate>
-        <input type="text" placeholder="Banco" value={bank} onChange={(e) => setBank(e.target.value)} />
+        <Select
+          value={bankId}
+          onChange={setBankId}
+          placeholder="Banco"
+          options={banks.map((b) => ({ value: b.id, label: b.name }))}
+          onCreate={handleCreateBank}
+          createLabel="Agregar banco"
+        />
         <input
           type="number"
           step="0.01"
@@ -243,6 +270,7 @@ export default function Loans() {
             const progressPct = Math.min(100, (paidAmount / loan.amount_to_repay) * 100)
             const isFinished = paidAmount >= loan.amount_to_repay
             const expanded = expandedLoanId === loan.id
+            const bankName = (loan.bank_id && bankById.get(loan.bank_id)?.name) || 'Sin banco'
 
             return (
               <div
@@ -255,7 +283,7 @@ export default function Loans() {
               >
                 <div className="loan-card-header">
                   <span className="loan-card-bank">
-                    {loan.bank}
+                    {bankName}
                     {isFinished && <span className="loan-badge-done">Finalizado</span>}
                   </span>
                   <button
@@ -317,7 +345,7 @@ export default function Loans() {
 
       {payLoan && (
         <Modal>
-          <h3>Registrar pago — {payLoan.bank}</h3>
+          <h3>Registrar pago — {(payLoan.bank_id && bankById.get(payLoan.bank_id)?.name) || 'Sin banco'}</h3>
           <form className="budget-form" onSubmit={handlePaySubmit} noValidate>
             <DateField value={payDate} onChange={setPayDate} />
             <input

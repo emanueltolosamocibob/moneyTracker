@@ -2025,7 +2025,7 @@ input[type='number'] {
   white-space: nowrap;
 }
 
-/* --- Configuración: categorías + fuentes de ingreso lado a lado --- */
+/* --- Configuración: categorías, fuentes de ingreso y bancos, 2 columnas --- */
 
 .settings-grid {
   display: grid;

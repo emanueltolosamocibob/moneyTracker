@@ -96,10 +96,17 @@ export interface InvestmentSale {
   created_at: string
 }
 
+export interface Bank {
+  id: string
+  user_id: string
+  name: string
+  created_at: string
+}
+
 export interface Loan {
   id: string
   user_id: string
-  bank: string
+  bank_id: string | null
   amount_requested: number
   amount_to_repay: number
   installments_count: number
@@ -181,6 +188,12 @@ export interface Database {
         Row: InvestmentSale
         Insert: Partial<InvestmentSale>
         Update: Partial<InvestmentSale>
+        Relationships: []
+      }
+      banks: {
+        Row: Bank
+        Insert: Partial<Bank>
+        Update: Partial<Bank>
         Relationships: []
       }
       loans: {
