@@ -2100,18 +2100,20 @@ input[type='number'] {
     justify-content: flex-end;
   }
 
-  /* En mobile, Gastado va debajo de Presupuestado (en vez de al lado),
-     ambos alineados a la derecha junto al período — más compacto en un
-     viewport angosto que la fila lado a lado de desktop. */
+  /* En mobile, Gastado va debajo de Presupuestado (en vez de al lado) —
+     más compacto en un viewport angosto que la fila lado a lado de
+     desktop. Alineados a la izquierda (no a la derecha como el resto de
+     los montos de la app) porque acá son el foco principal de la
+     pantalla, no un valor de tabla. */
   .budget-summary {
     flex-direction: column;
-    align-items: flex-end;
+    align-items: flex-start;
     gap: 0.2rem;
   }
 
   .budget-summary > div {
-    align-items: flex-end;
-    text-align: right;
+    align-items: flex-start;
+    text-align: left;
   }
 
   .budget-summary-amount {
@@ -2127,7 +2129,7 @@ input[type='number'] {
   }
 
   .budget-period-label {
-    text-align: right;
+    text-align: left;
   }
 
   .budget-grid {
