@@ -27,25 +27,35 @@ export default function Layout() {
   return (
     <div className="app-shell gradient-bg">
       <aside className={`sidebar${collapsed ? ' collapsed' : ''}${mobileOpen ? ' mobile-open' : ''}`}>
-        <div className="sidebar-brand">
+        <div
+          className="sidebar-brand"
+          onClick={() => setMobileOpen((o) => !o)}
+          role="button"
+          tabIndex={0}
+          aria-label={mobileOpen ? 'Cerrar menú' : 'Abrir menú'}
+          aria-expanded={mobileOpen}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault()
+              setMobileOpen((o) => !o)
+            }
+          }}
+        >
           <span className="brand nav-label">AutoGasto</span>
           <button
             type="button"
             className="sidebar-toggle"
-            onClick={() => setCollapsed((c) => !c)}
+            onClick={(e) => {
+              e.stopPropagation()
+              setCollapsed((c) => !c)
+            }}
             aria-label={collapsed ? 'Expandir menú' : 'Colapsar menú'}
           >
             <IconChevronDown size={16} />
           </button>
-          <button
-            type="button"
-            className={`mobile-menu-toggle${mobileOpen ? ' open' : ''}`}
-            onClick={() => setMobileOpen((o) => !o)}
-            aria-label={mobileOpen ? 'Cerrar menú' : 'Abrir menú'}
-            aria-expanded={mobileOpen}
-          >
+          <span className={`mobile-menu-toggle${mobileOpen ? ' open' : ''}`} aria-hidden="true">
             <IconChevronDown size={20} />
-          </button>
+          </span>
         </div>
         <nav className="sidebar-nav">
           <NavLink to="/" end className="nav-btn">
