@@ -1,17 +1,18 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { supabase } from '../lib/supabaseClient'
 import { useAuth } from '../lib/AuthContext'
-import type { Category, IncomeSource } from '../types/database'
+import type { Bank, Category, IncomeSource } from '../types/database'
 import { IconPencil, IconPlus, IconTrash } from '../components/icons'
 import Modal from '../components/Modal'
 import { getCategoryIcon, ICON_OPTIONS } from '../lib/categoryIcons'
 
-type PendingDelete = { kind: 'category' | 'income_source'; id: string; name: string }
+type PendingDelete = { kind: 'category' | 'income_source' | 'bank'; id: string; name: string }
 
 export default function Settings() {
   const { user } = useAuth()
   const [categories, setCategories] = useState<Category[]>([])
   const [incomeSources, setIncomeSources] = useState<IncomeSource[]>([])
+  const [banks, setBanks] = useState<Bank[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -26,6 +27,11 @@ export default function Settings() {
   const [sourceFormError, setSourceFormError] = useState<string | null>(null)
   const [sourceSaving, setSourceSaving] = useState(false)
 
+  const [bankModal, setBankModal] = useState<Bank | 'new' | null>(null)
+  const [bankName, setBankName] = useState('')
+  const [bankFormError, setBankFormError] = useState<string | null>(null)
+  const [bankSaving, setBankSaving] = useState(false)
+
   const [pendingDelete, setPendingDelete] = useState<PendingDelete | null>(null)
   const [deleting, setDeleting] = useState(false)
 
@@ -37,14 +43,21 @@ export default function Settings() {
 
   async function load() {
     setLoading(true)
-    const [{ data: cats, error: catError }, { data: sources, error: sourceError }] = await Promise.all([
+    const [
+      { data: cats, error: catError },
+      { data: sources, error: sourceError },
+      { data: bankRows, error: bankError },
+    ] = await Promise.all([
       supabase.from('categories').select('*').order('name'),
       supabase.from('income_sources').select('*').order('name'),
+      supabase.from('banks').select('*').order('name'),
     ])
     if (catError) setError(catError.message)
     else if (sourceError) setError(sourceError.message)
+    else if (bankError) setError(bankError.message)
     setCategories(cats ?? [])
     setIncomeSources(sources ?? [])
+    setBanks(bankRows ?? [])
     setLoading(false)
   }
 
@@ -122,11 +135,45 @@ export default function Settings() {
     load()
   }
 
+  function openNewBank() {
+    setBankName('')
+    setBankFormError(null)
+    setBankModal('new')
+  }
+
+  function openEditBank(b: Bank) {
+    setBankName(b.name)
+    setBankFormError(null)
+    setBankModal(b)
+  }
+
+  async function handleBankSubmit(e: FormEvent) {
+    e.preventDefault()
+    const name = bankName.trim()
+    if (!name) {
+      setBankFormError('Rellená este campo.')
+      return
+    }
+    if (!user) return
+    setBankSaving(true)
+    const { error: saveError } =
+      bankModal === 'new'
+        ? await supabase.from('banks').insert({ user_id: user.id, name })
+        : await supabase.from('banks').update({ name }).eq('id', bankModal!.id)
+    setBankSaving(false)
+    if (saveError) {
+      setBankFormError(saveError.message)
+      return
+    }
+    setBankModal(null)
+    load()
+  }
+
   async function confirmDelete() {
     const target = pendingDelete
     if (!target) return
     setDeleting(true)
-    const table = target.kind === 'category' ? 'categories' : 'income_sources'
+    const table = target.kind === 'category' ? 'categories' : target.kind === 'income_source' ? 'income_sources' : 'banks'
     const { error: deleteError } = await supabase.from(table).delete().eq('id', target.id)
     setDeleting(false)
     if (deleteError) {
@@ -275,6 +322,54 @@ export default function Settings() {
               </div>
             )}
           </section>
+
+          <section className="settings-panel">
+            <div className="settings-panel-header">
+              <h3>Bancos</h3>
+              <button type="button" className="gmail-scan-btn" onClick={openNewBank}>
+                <IconPlus size={14} /> Agregar
+              </button>
+            </div>
+            {banks.length === 0 ? (
+              <p className="empty-state">Todavía no tenés bancos cargados.</p>
+            ) : (
+              <div className="tx-table-scroll">
+                <table className="tx-table">
+                  <thead>
+                    <tr>
+                      <th>Banco</th>
+                      <th></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {banks.map((b) => (
+                      <tr key={b.id}>
+                        <td className="tx-merchant">{b.name}</td>
+                        <td className="tx-actions">
+                          <button
+                            type="button"
+                            className="tx-edit-btn"
+                            aria-label={`Editar ${b.name}`}
+                            onClick={() => openEditBank(b)}
+                          >
+                            <IconPencil size={14} />
+                          </button>
+                          <button
+                            type="button"
+                            className="tx-delete-btn"
+                            aria-label={`Eliminar ${b.name}`}
+                            onClick={() => setPendingDelete({ kind: 'bank', id: b.id, name: b.name })}
+                          >
+                            <IconTrash size={14} />
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </section>
         </div>
       )}
 
@@ -357,14 +452,44 @@ export default function Settings() {
         </Modal>
       )}
 
+      {bankModal && (
+        <Modal>
+          <h3>{bankModal === 'new' ? 'Nuevo banco' : 'Editar banco'}</h3>
+          <form className="tx-edit-form" onSubmit={handleBankSubmit} noValidate>
+            <div className="tx-field">
+              <input
+                type="text"
+                placeholder="Nombre"
+                value={bankName}
+                onChange={(e) => setBankName(e.target.value)}
+                autoFocus
+              />
+            </div>
+            {bankFormError && <p className="error">{bankFormError}</p>}
+            <div className="modal-actions">
+              <button type="button" onClick={() => setBankModal(null)}>
+                Cancelar
+              </button>
+              <button type="submit" className="primary" disabled={bankSaving}>
+                {bankSaving ? 'Guardando...' : bankModal === 'new' ? 'Crear banco' : 'Guardar cambios'}
+              </button>
+            </div>
+          </form>
+        </Modal>
+      )}
+
       {pendingDelete && (
         <Modal>
-          <h3>Eliminar {pendingDelete.kind === 'category' ? 'categoría' : 'fuente de ingreso'}</h3>
+          <h3>
+            Eliminar {pendingDelete.kind === 'category' ? 'categoría' : pendingDelete.kind === 'income_source' ? 'fuente de ingreso' : 'banco'}
+          </h3>
           <p>
             Se va a eliminar &quot;{pendingDelete.name}&quot;.{' '}
             {pendingDelete.kind === 'category'
               ? 'Las transacciones que la usan quedan sin categoría, y se borra cualquier tope de presupuesto definido para ella.'
-              : 'Las transacciones que la usan quedan sin fuente de ingreso.'}{' '}
+              : pendingDelete.kind === 'income_source'
+                ? 'Las transacciones que la usan quedan sin fuente de ingreso.'
+                : 'Los préstamos que lo usan quedan sin banco asignado.'}{' '}
             Esta acción no se puede deshacer.
           </p>
           <div className="modal-actions">
