@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { supabase } from '../lib/supabaseClient'
 import { useAuth } from '../lib/AuthContext'
-import type { Bank, Loan, LoanPayment } from '../types/database'
+import type { Bank, Loan, LoanCurrency, LoanPayment } from '../types/database'
 import { IconChevronDown, IconPencil, IconPlus } from '../components/icons'
 import Modal from '../components/Modal'
 import DateField from '../components/DateField'
@@ -11,8 +11,21 @@ function formatMoney(amount: number) {
   return amount.toLocaleString('es-AR', { style: 'currency', currency: 'ARS', minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
 
+// UVA no es una moneda ISO, así que no entra en Intl.NumberFormat con
+// style:'currency' como el resto de los montos de la app — se arma el
+// sufijo a mano.
+function formatUva(amount: number) {
+  return `${amount.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} UVA`
+}
+
+function formatLoanAmount(amount: number, currency: LoanCurrency) {
+  return currency === 'UVA' ? formatUva(amount) : formatMoney(amount)
+}
+
 // Máscara de monto tipo "POS", igual que en Transactions.tsx/Budgets.tsx: el
 // usuario solo tipea dígitos, los últimos dos son siempre los centavos.
+// Solo aplica a montos en pesos — un préstamo en UVA usa un input de
+// cantidad común (ver sanitizeDecimalInput), porque UVA no tiene "centavos".
 function centsToNumber(digits: string) {
   return Number(digits || '0') / 100
 }
@@ -24,6 +37,31 @@ function formatAmountDigits(digits: string) {
 
 function numberToCentsDigits(amount: number) {
   return Math.round(amount * 100).toString()
+}
+
+// Para cantidades de UVA: solo dígitos y un único punto decimal, sin
+// máscara de centavos (a diferencia de un monto en pesos, acá el usuario
+// tipea el número tal cual, ej. "1234.56").
+function sanitizeDecimalInput(raw: string) {
+  const cleaned = raw.replace(/[^\d.]/g, '')
+  const firstDot = cleaned.indexOf('.')
+  if (firstDot === -1) return cleaned
+  return cleaned.slice(0, firstDot + 1) + cleaned.slice(firstDot + 1).replace(/\./g, '')
+}
+
+// Valor de la UVA (en pesos) para una fecha puntual — ver api/uva/value.ts.
+// Se usa al registrar el pago de una cuota en UVA, para guardar junto con
+// el pago cuánto valía la UVA ese día y poder mostrar su equivalente en
+// pesos después.
+async function fetchUvaValue(date: string): Promise<number> {
+  const { data: sessionData } = await supabase.auth.getSession()
+  const token = sessionData.session?.access_token
+  const res = await fetch(`/api/uva/value?date=${date}`, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  })
+  const json = await res.json()
+  if (!res.ok) throw new Error(json.error ?? 'No se pudo obtener el valor de la UVA.')
+  return json.value as number
 }
 
 function todayDateInput() {
@@ -48,8 +86,13 @@ export default function Loans() {
 
   const [formOpen, setFormOpen] = useState(false)
   const [bankId, setBankId] = useState('')
+  const [currency, setCurrency] = useState<LoanCurrency>('ARS')
   const [amountRequestedDigits, setAmountRequestedDigits] = useState('')
   const [amountToRepayDigits, setAmountToRepayDigits] = useState('')
+  // Cantidad de UVAs cuando currency='UVA' — inputs separados de los de
+  // arriba porque la UI es distinta (número común, no máscara de centavos).
+  const [amountRequestedUva, setAmountRequestedUva] = useState('')
+  const [amountToRepayUva, setAmountToRepayUva] = useState('')
   const [installmentsCount, setInstallmentsCount] = useState('')
   const [saving, setSaving] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
@@ -59,13 +102,17 @@ export default function Loans() {
   const [payLoan, setPayLoan] = useState<Loan | null>(null)
   const [payDate, setPayDate] = useState(todayDateInput())
   const [payAmountDigits, setPayAmountDigits] = useState('')
+  const [payAmountUva, setPayAmountUva] = useState('')
   const [paySaving, setPaySaving] = useState(false)
   const [payError, setPayError] = useState<string | null>(null)
 
   const [editLoan, setEditLoan] = useState<Loan | null>(null)
   const [editBankId, setEditBankId] = useState('')
+  const [editCurrency, setEditCurrency] = useState<LoanCurrency>('ARS')
   const [editAmountRequestedDigits, setEditAmountRequestedDigits] = useState('')
   const [editAmountToRepayDigits, setEditAmountToRepayDigits] = useState('')
+  const [editAmountRequestedUva, setEditAmountRequestedUva] = useState('')
+  const [editAmountToRepayUva, setEditAmountToRepayUva] = useState('')
   const [editInstallmentsCount, setEditInstallmentsCount] = useState('')
   const [editSaving, setEditSaving] = useState(false)
   const [editError, setEditError] = useState<string | null>(null)
@@ -82,6 +129,7 @@ export default function Loans() {
   const [editingPayment, setEditingPayment] = useState<LoanPayment | null>(null)
   const [editPaymentDate, setEditPaymentDate] = useState('')
   const [editPaymentAmountDigits, setEditPaymentAmountDigits] = useState('')
+  const [editPaymentAmountUva, setEditPaymentAmountUva] = useState('')
   const [editPaymentSaving, setEditPaymentSaving] = useState(false)
   const [editPaymentError, setEditPaymentError] = useState<string | null>(null)
 
@@ -129,6 +177,11 @@ export default function Loans() {
 
   const bankById = useMemo(() => new Map(banks.map((b) => [b.id, b])), [banks])
 
+  const loanById = useMemo(() => new Map(loans.map((l) => [l.id, l])), [loans])
+  // Moneda del préstamo dueño de la cuota en edición — la cuota en sí no
+  // guarda su moneda (la hereda del préstamo).
+  const editingPaymentCurrency: LoanCurrency = (editingPayment && loanById.get(editingPayment.loan_id)?.currency) || 'ARS'
+
   async function handleCreateBank(name: string) {
     if (!user) return
     const { data, error: insertError } = await supabase.from('banks').insert({ user_id: user.id, name }).select().single()
@@ -145,8 +198,8 @@ export default function Loans() {
     if (!user) return
     setFormError(null)
 
-    const requestedNum = centsToNumber(amountRequestedDigits)
-    const repayNum = centsToNumber(amountToRepayDigits)
+    const requestedNum = currency === 'UVA' ? Number(amountRequestedUva || '0') : centsToNumber(amountRequestedDigits)
+    const repayNum = currency === 'UVA' ? Number(amountToRepayUva || '0') : centsToNumber(amountToRepayDigits)
     const installmentsNum = Number(installmentsCount)
 
     if (!bankId) {
@@ -170,6 +223,7 @@ export default function Loans() {
     const { error: insertError } = await supabase.from('loans').insert({
       user_id: user.id,
       bank_id: bankId,
+      currency,
       amount_requested: requestedNum,
       amount_to_repay: repayNum,
       installments_count: installmentsNum,
@@ -182,8 +236,11 @@ export default function Loans() {
     }
 
     setBankId('')
+    setCurrency('ARS')
     setAmountRequestedDigits('')
     setAmountToRepayDigits('')
+    setAmountRequestedUva('')
+    setAmountToRepayUva('')
     setInstallmentsCount('')
     setFormOpen(false)
     load()
@@ -197,6 +254,7 @@ export default function Loans() {
     setPayLoan(loan)
     setPayDate(todayDateInput())
     setPayAmountDigits('')
+    setPayAmountUva('')
     setPayError(null)
   }
 
@@ -205,7 +263,7 @@ export default function Loans() {
     if (!user || !payLoan) return
     setPayError(null)
 
-    const amountNum = centsToNumber(payAmountDigits)
+    const amountNum = payLoan.currency === 'UVA' ? Number(payAmountUva || '0') : centsToNumber(payAmountDigits)
     if (!payDate) {
       setPayError('Ingresá una fecha.')
       return
@@ -216,11 +274,28 @@ export default function Loans() {
     }
 
     setPaySaving(true)
+
+    // Para un préstamo en UVA, el pago se registra en cantidad de UVAs pero
+    // se guarda también el valor de la UVA ese día — así la conversión a
+    // pesos de esa cuota queda fija (no recalculada con el valor de hoy
+    // cada vez que se muestra).
+    let uvaValue: number | null = null
+    if (payLoan.currency === 'UVA') {
+      try {
+        uvaValue = await fetchUvaValue(payDate)
+      } catch (err) {
+        setPaySaving(false)
+        setPayError((err as Error).message)
+        return
+      }
+    }
+
     const { error: insertError } = await supabase.from('loan_payments').insert({
       user_id: user.id,
       loan_id: payLoan.id,
       payment_date: payDate,
       amount: amountNum,
+      uva_value: uvaValue,
     })
     setPaySaving(false)
 
@@ -236,9 +311,11 @@ export default function Loans() {
   function openEditLoan(loan: Loan) {
     setEditLoan(loan)
     setEditBankId(loan.bank_id ?? '')
-    setEditAmountRequestedDigits(numberToCentsDigits(loan.amount_requested))
-    setEditAmountToRepayDigits(numberToCentsDigits(loan.amount_to_repay))
-    setEditInstallmentsCount(String(loan.installments_count))
+    setEditCurrency(loan.currency)
+    setEditAmountRequestedDigits(loan.currency === 'ARS' ? numberToCentsDigits(loan.amount_requested) : '')
+    setEditAmountToRepayDigits(loan.currency === 'ARS' ? numberToCentsDigits(loan.amount_to_repay) : '')
+    setEditAmountRequestedUva(loan.currency === 'UVA' ? String(loan.amount_requested) : '')
+    setEditAmountToRepayUva(loan.currency === 'UVA' ? String(loan.amount_to_repay) : '')
     setEditError(null)
   }
 
@@ -247,8 +324,9 @@ export default function Loans() {
     if (!editLoan) return
     setEditError(null)
 
-    const requestedNum = centsToNumber(editAmountRequestedDigits)
-    const repayNum = centsToNumber(editAmountToRepayDigits)
+    const requestedNum =
+      editCurrency === 'UVA' ? Number(editAmountRequestedUva || '0') : centsToNumber(editAmountRequestedDigits)
+    const repayNum = editCurrency === 'UVA' ? Number(editAmountToRepayUva || '0') : centsToNumber(editAmountToRepayDigits)
     const installmentsNum = Number(editInstallmentsCount)
 
     if (!editBankId) {
@@ -273,6 +351,7 @@ export default function Loans() {
       .from('loans')
       .update({
         bank_id: editBankId,
+        currency: editCurrency,
         amount_requested: requestedNum,
         amount_to_repay: repayNum,
         installments_count: installmentsNum,
@@ -311,9 +390,11 @@ export default function Loans() {
   }
 
   function openEditPayment(p: LoanPayment) {
+    const paymentCurrency = loanById.get(p.loan_id)?.currency ?? 'ARS'
     setEditingPayment(p)
     setEditPaymentDate(p.payment_date)
-    setEditPaymentAmountDigits(numberToCentsDigits(p.amount))
+    setEditPaymentAmountDigits(paymentCurrency === 'ARS' ? numberToCentsDigits(p.amount) : '')
+    setEditPaymentAmountUva(paymentCurrency === 'UVA' ? String(p.amount) : '')
     setEditPaymentError(null)
   }
 
@@ -322,7 +403,8 @@ export default function Loans() {
     if (!editingPayment) return
     setEditPaymentError(null)
 
-    const amountNum = centsToNumber(editPaymentAmountDigits)
+    const amountNum =
+      editingPaymentCurrency === 'UVA' ? Number(editPaymentAmountUva || '0') : centsToNumber(editPaymentAmountDigits)
     if (!editPaymentDate) {
       setEditPaymentError('Ingresá una fecha.')
       return
@@ -333,9 +415,23 @@ export default function Loans() {
     }
 
     setEditPaymentSaving(true)
+
+    // Misma lógica que al registrar el pago: si la fecha cambió, el valor
+    // de la UVA guardado también tiene que actualizarse para esa fecha.
+    let uvaValue: number | null = null
+    if (editingPaymentCurrency === 'UVA') {
+      try {
+        uvaValue = await fetchUvaValue(editPaymentDate)
+      } catch (err) {
+        setEditPaymentSaving(false)
+        setEditPaymentError((err as Error).message)
+        return
+      }
+    }
+
     const { error: updateError } = await supabase
       .from('loan_payments')
-      .update({ payment_date: editPaymentDate, amount: amountNum })
+      .update({ payment_date: editPaymentDate, amount: amountNum, uva_value: uvaValue })
       .eq('id', editingPayment.id)
     setEditPaymentSaving(false)
 
@@ -385,22 +481,53 @@ export default function Loans() {
           onCreate={handleCreateBank}
           createLabel="Agregar banco"
         />
-        <input
-          type="text"
-          inputMode="numeric"
-          className="amount-input"
-          placeholder="Monto solicitado"
-          value={formatAmountDigits(amountRequestedDigits)}
-          onChange={(e) => setAmountRequestedDigits(e.target.value.replace(/\D/g, '').slice(0, 12))}
-        />
-        <input
-          type="text"
-          inputMode="numeric"
-          className="amount-input"
-          placeholder="Monto a devolver"
-          value={formatAmountDigits(amountToRepayDigits)}
-          onChange={(e) => setAmountToRepayDigits(e.target.value.replace(/\D/g, '').slice(0, 12))}
-        />
+        <div className="type-toggle" role="group" aria-label="Moneda">
+          <button type="button" className={currency === 'ARS' ? 'active' : ''} onClick={() => setCurrency('ARS')}>
+            ARS
+          </button>
+          <button type="button" className={currency === 'UVA' ? 'active' : ''} onClick={() => setCurrency('UVA')}>
+            UVA
+          </button>
+        </div>
+        {currency === 'ARS' ? (
+          <>
+            <input
+              type="text"
+              inputMode="numeric"
+              className="amount-input"
+              placeholder="Monto solicitado"
+              value={formatAmountDigits(amountRequestedDigits)}
+              onChange={(e) => setAmountRequestedDigits(e.target.value.replace(/\D/g, '').slice(0, 12))}
+            />
+            <input
+              type="text"
+              inputMode="numeric"
+              className="amount-input"
+              placeholder="Monto a devolver"
+              value={formatAmountDigits(amountToRepayDigits)}
+              onChange={(e) => setAmountToRepayDigits(e.target.value.replace(/\D/g, '').slice(0, 12))}
+            />
+          </>
+        ) : (
+          <>
+            <input
+              type="text"
+              inputMode="decimal"
+              className="amount-input"
+              placeholder="Cantidad de UVAs solicitadas"
+              value={amountRequestedUva}
+              onChange={(e) => setAmountRequestedUva(sanitizeDecimalInput(e.target.value))}
+            />
+            <input
+              type="text"
+              inputMode="decimal"
+              className="amount-input"
+              placeholder="Cantidad de UVAs a devolver"
+              value={amountToRepayUva}
+              onChange={(e) => setAmountToRepayUva(sanitizeDecimalInput(e.target.value))}
+            />
+          </>
+        )}
         <input
           type="number"
           step="1"
@@ -429,7 +556,15 @@ export default function Loans() {
         <div className="loan-list">
           {loans.map((loan) => {
             const loanPayments = paymentsByLoan.get(loan.id) ?? []
+            // Suma en la moneda nativa del préstamo (UVA o ARS) — es lo que
+            // hay que comparar contra amount_to_repay para el progreso, ya
+            // que ambos están en la misma unidad.
             const paidAmount = loanPayments.reduce((sum, p) => sum + p.amount, 0)
+            // Equivalente en pesos de lo pagado hasta ahora, solo relevante
+            // para préstamos en UVA: cada cuota se convierte con SU propio
+            // valor de UVA del día (no el de hoy), por eso es una suma de
+            // pagos individuales y no paidAmount * valor actual.
+            const paidAmountArs = loanPayments.reduce((sum, p) => sum + p.amount * (p.uva_value ?? 0), 0)
             const progressPct = Math.min(100, (paidAmount / loan.amount_to_repay) * 100)
             const isFinished = paidAmount >= loan.amount_to_repay
             const expanded = expandedLoanId === loan.id
@@ -477,14 +612,18 @@ export default function Loans() {
                 </div>
                 <div className="loan-card-amounts">
                   <span>
-                    Solicitado: <strong>{formatMoney(loan.amount_requested)}</strong>
+                    Solicitado: <strong>{formatLoanAmount(loan.amount_requested, loan.currency)}</strong>
                   </span>
                   <span>
-                    Interés: <strong>{formatMoney(loan.amount_to_repay - loan.amount_requested)}</strong>
+                    Interés:{' '}
+                    <strong>{formatLoanAmount(loan.amount_to_repay - loan.amount_requested, loan.currency)}</strong>
                   </span>
                 </div>
                 <strong className="loan-card-paid">
-                  {formatMoney(paidAmount)} / {formatMoney(loan.amount_to_repay)}
+                  {formatLoanAmount(paidAmount, loan.currency)} / {formatLoanAmount(loan.amount_to_repay, loan.currency)}
+                  {loan.currency === 'UVA' && paidAmount > 0 && (
+                    <span className="loan-card-paid-ars"> (≈ {formatMoney(paidAmountArs)})</span>
+                  )}
                 </strong>
                 <div className="loan-progress-row">
                   <div className="loan-progress">
@@ -516,7 +655,12 @@ export default function Loans() {
                             >
                               <td>{i + 1}</td>
                               <td>{formatDateShort(p.payment_date)}</td>
-                              <td className="tx-amount">{formatMoney(p.amount)}</td>
+                              <td className="tx-amount">
+                                {formatLoanAmount(p.amount, loan.currency)}
+                                {loan.currency === 'UVA' && p.uva_value != null && (
+                                  <span className="loan-card-paid-ars"> ({formatMoney(p.amount * p.uva_value)})</span>
+                                )}
+                              </td>
                             </tr>
                           ))}
                         </tbody>
@@ -535,14 +679,25 @@ export default function Loans() {
           <h3>Registrar pago — {(payLoan.bank_id && bankById.get(payLoan.bank_id)?.name) || 'Sin banco'}</h3>
           <form className="budget-form" onSubmit={handlePaySubmit} noValidate>
             <DateField value={payDate} onChange={setPayDate} />
-            <input
-              type="text"
-              inputMode="numeric"
-              className="amount-input"
-              placeholder="Monto"
-              value={formatAmountDigits(payAmountDigits)}
-              onChange={(e) => setPayAmountDigits(e.target.value.replace(/\D/g, '').slice(0, 12))}
-            />
+            {payLoan.currency === 'ARS' ? (
+              <input
+                type="text"
+                inputMode="numeric"
+                className="amount-input"
+                placeholder="Monto"
+                value={formatAmountDigits(payAmountDigits)}
+                onChange={(e) => setPayAmountDigits(e.target.value.replace(/\D/g, '').slice(0, 12))}
+              />
+            ) : (
+              <input
+                type="text"
+                inputMode="decimal"
+                className="amount-input"
+                placeholder="Cantidad de UVAs"
+                value={payAmountUva}
+                onChange={(e) => setPayAmountUva(sanitizeDecimalInput(e.target.value))}
+              />
+            )}
             {payError && <p className="error">{payError}</p>}
             <div className="modal-actions">
               <button type="button" onClick={() => setPayLoan(null)}>
@@ -568,22 +723,53 @@ export default function Loans() {
               onCreate={handleCreateBank}
               createLabel="Agregar banco"
             />
-            <input
-              type="text"
-              inputMode="numeric"
-              className="amount-input"
-              placeholder="Monto solicitado"
-              value={formatAmountDigits(editAmountRequestedDigits)}
-              onChange={(e) => setEditAmountRequestedDigits(e.target.value.replace(/\D/g, '').slice(0, 12))}
-            />
-            <input
-              type="text"
-              inputMode="numeric"
-              className="amount-input"
-              placeholder="Monto a devolver"
-              value={formatAmountDigits(editAmountToRepayDigits)}
-              onChange={(e) => setEditAmountToRepayDigits(e.target.value.replace(/\D/g, '').slice(0, 12))}
-            />
+            <div className="type-toggle" role="group" aria-label="Moneda">
+              <button type="button" className={editCurrency === 'ARS' ? 'active' : ''} onClick={() => setEditCurrency('ARS')}>
+                ARS
+              </button>
+              <button type="button" className={editCurrency === 'UVA' ? 'active' : ''} onClick={() => setEditCurrency('UVA')}>
+                UVA
+              </button>
+            </div>
+            {editCurrency === 'ARS' ? (
+              <>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  className="amount-input"
+                  placeholder="Monto solicitado"
+                  value={formatAmountDigits(editAmountRequestedDigits)}
+                  onChange={(e) => setEditAmountRequestedDigits(e.target.value.replace(/\D/g, '').slice(0, 12))}
+                />
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  className="amount-input"
+                  placeholder="Monto a devolver"
+                  value={formatAmountDigits(editAmountToRepayDigits)}
+                  onChange={(e) => setEditAmountToRepayDigits(e.target.value.replace(/\D/g, '').slice(0, 12))}
+                />
+              </>
+            ) : (
+              <>
+                <input
+                  type="text"
+                  inputMode="decimal"
+                  className="amount-input"
+                  placeholder="Cantidad de UVAs solicitadas"
+                  value={editAmountRequestedUva}
+                  onChange={(e) => setEditAmountRequestedUva(sanitizeDecimalInput(e.target.value))}
+                />
+                <input
+                  type="text"
+                  inputMode="decimal"
+                  className="amount-input"
+                  placeholder="Cantidad de UVAs a devolver"
+                  value={editAmountToRepayUva}
+                  onChange={(e) => setEditAmountToRepayUva(sanitizeDecimalInput(e.target.value))}
+                />
+              </>
+            )}
             <input
               type="number"
               step="1"
@@ -613,14 +799,25 @@ export default function Loans() {
           <h3>Editar cuota</h3>
           <form className="budget-form" onSubmit={handleEditPaymentSubmit} noValidate>
             <DateField value={editPaymentDate} onChange={setEditPaymentDate} />
-            <input
-              type="text"
-              inputMode="numeric"
-              className="amount-input"
-              placeholder="Monto"
-              value={formatAmountDigits(editPaymentAmountDigits)}
-              onChange={(e) => setEditPaymentAmountDigits(e.target.value.replace(/\D/g, '').slice(0, 12))}
-            />
+            {editingPaymentCurrency === 'ARS' ? (
+              <input
+                type="text"
+                inputMode="numeric"
+                className="amount-input"
+                placeholder="Monto"
+                value={formatAmountDigits(editPaymentAmountDigits)}
+                onChange={(e) => setEditPaymentAmountDigits(e.target.value.replace(/\D/g, '').slice(0, 12))}
+              />
+            ) : (
+              <input
+                type="text"
+                inputMode="decimal"
+                className="amount-input"
+                placeholder="Cantidad de UVAs"
+                value={editPaymentAmountUva}
+                onChange={(e) => setEditPaymentAmountUva(sanitizeDecimalInput(e.target.value))}
+              />
+            )}
             {editPaymentError && <p className="error">{editPaymentError}</p>}
             <div className="modal-actions">
               <button

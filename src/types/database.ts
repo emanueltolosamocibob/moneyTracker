@@ -103,13 +103,19 @@ export interface Bank {
   created_at: string
 }
 
+export type LoanCurrency = 'ARS' | 'UVA'
+
 export interface Loan {
   id: string
   user_id: string
   bank_id: string | null
+  // Cantidad de pesos si currency='ARS', cantidad de UVAs si currency='UVA'
+  // — la conversión a pesos de un préstamo en UVA se hace pago a pago (ver
+  // LoanPayment.uva_value), no acá.
   amount_requested: number
   amount_to_repay: number
   installments_count: number
+  currency: LoanCurrency
   created_at: string
 }
 
@@ -118,7 +124,12 @@ export interface LoanPayment {
   user_id: string
   loan_id: string
   payment_date: string // 'YYYY-MM-DD'
+  // Mismo criterio que Loan.amount_*: pesos o UVAs según la moneda del
+  // préstamo dueño de este pago.
   amount: number
+  // Valor de la UVA en pesos el día de este pago (null para préstamos en
+  // ARS, o para pagos UVA cargados antes de que existiera esta columna).
+  uva_value: number | null
   created_at: string
 }
 
