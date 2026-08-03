@@ -102,11 +102,11 @@ All of this lives in the one global `src/index.css` (no CSS modules, no styled-c
 
 ### Investment symbol search
 
-`src/components/SymbolSearch.tsx` is the "Símbolo" field in Inversiones — same `.select`/`.select-panel` wrapper as `Select.tsx` (so the dropdown looks identical) but with a real `<input>` instead of a button-trigger, since here the value is typed, not picked from a fixed list. It debounces (250ms) and calls `GET /api/investments/symbols?market=ar|world&q=...`, which only ever returns ticker strings — never price.
+`src/components/SymbolSearch.tsx` is the "Símbolo" field in Inversiones — same `.select`/`.select-panel` wrapper as `Select.tsx` (so the dropdown looks identical) but with a real `<input>` instead of a button-trigger, since here the value is typed, not picked from a fixed list. It debounces (250ms) and calls `GET /api/investments/symbols?q=...`, which only ever returns ticker strings — never price. The ARS/USD toggle in the form does **not** filter this search — both sources are always queried and merged, because the toggle only picks how the position gets valued, not which symbols are legitimate to buy in which currency. Selecting an option calls a separate `onSelect` prop (vs. `onChange`, which fires on every keystroke too) — `Investments.tsx` uses that distinction to require an actual pick from the list before `handleAdd` will insert a lot, rejecting free-typed text that never matched a suggestion.
 
-`api/investments/symbols.ts` is JWT-gated (`getUserIdFromRequest`, same as the Gmail routes) so an anonymous caller can't burn through the Twelve Data quota via this proxy. Two sources, picked per currency:
-- **ARS** (`market=ar`): `https://data912.com/live/arg_stocks` — an unauthenticated public endpoint mirroring ByMA, but with no CORS headers, so it has to be proxied server-side even though it needs no secret.
-- **USD** (`market=world`): Twelve Data's `symbol_search` endpoint, which does need a key — `TWELVE_DATA_API_KEY` in Vercel env vars. Get a free key at https://twelvedata.com (no card required).
+`api/investments/symbols.ts` is JWT-gated (`getUserIdFromRequest`, same as the Gmail routes) so an anonymous caller can't burn through the Twelve Data quota via this proxy. Every request queries both sources in parallel (`Promise.allSettled`, so one source failing doesn't sink the other) and returns the merged, deduped result:
+- `https://data912.com/live/arg_stocks` — an unauthenticated public endpoint mirroring ByMA, but with no CORS headers, so it has to be proxied server-side even though it needs no secret.
+- Twelve Data's `symbol_search` endpoint, which does need a key — `TWELVE_DATA_API_KEY` in Vercel env vars (already set). Twelve Data's response actually includes more than the symbol (`instrument_name`, `exchange`, `country`, `currency`, `instrument_type`, `mic_code`) — all discarded today since only the ticker is used, but there if a richer picker (e.g. showing the company name) is wanted later.
 
 ### Mobile layout (< 720px)
 

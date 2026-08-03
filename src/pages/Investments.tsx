@@ -61,6 +61,11 @@ export default function Investments() {
   const [formOpen, setFormOpen] = useState(false)
   const [market, setMarket] = useState<InvestmentMarket>('ar')
   const [symbol, setSymbol] = useState('')
+  // Solo true cuando el símbolo vino de elegir una opción de la lista de
+  // SymbolSearch (no de tipear) — bloquea el submit si no hay una elección
+  // real, ver handleAdd.
+  const [symbolConfirmed, setSymbolConfirmed] = useState(false)
+  const [buyDate, setBuyDate] = useState(todayDateInput())
   const [price, setPrice] = useState('')
   const [quantity, setQuantity] = useState('')
   const [saving, setSaving] = useState(false)
@@ -194,8 +199,12 @@ export default function Investments() {
     const priceNum = Number(price)
     const qtyNum = Number(quantity)
 
-    if (!trimmedSymbol) {
-      setFormError('Ingresá un símbolo.')
+    if (!trimmedSymbol || !symbolConfirmed) {
+      setFormError('Elegí un símbolo de la lista.')
+      return
+    }
+    if (!buyDate) {
+      setFormError('Ingresá una fecha.')
       return
     }
     if (!(priceNum > 0)) {
@@ -212,7 +221,7 @@ export default function Investments() {
       user_id: user.id,
       symbol: trimmedSymbol,
       market,
-      buy_date: todayDateInput(),
+      buy_date: buyDate,
       buy_quantity: qtyNum,
       buy_price: priceNum,
       remaining_quantity: qtyNum,
@@ -225,6 +234,8 @@ export default function Investments() {
     }
 
     setSymbol('')
+    setSymbolConfirmed(false)
+    setBuyDate(todayDateInput())
     setPrice('')
     setQuantity('')
     setFormOpen(false)
@@ -452,7 +463,7 @@ export default function Investments() {
         onClick={() => setFormOpen((o) => !o)}
         aria-expanded={formOpen}
       >
-        <IconPlus size={14} /> Agregar símbolo
+        <IconPlus size={14} /> Agregar compra de símbolo
         <IconChevronDown size={16} />
       </button>
 
@@ -465,7 +476,15 @@ export default function Investments() {
             USD
           </button>
         </div>
-        <SymbolSearch value={symbol} onChange={setSymbol} market={market} />
+        <SymbolSearch
+          value={symbol}
+          onChange={(v) => {
+            setSymbol(v)
+            setSymbolConfirmed(false)
+          }}
+          onSelect={() => setSymbolConfirmed(true)}
+        />
+        <input type="date" value={buyDate} onChange={(e) => setBuyDate(e.target.value)} />
         <input
           type="number"
           step="0.01"
@@ -500,7 +519,7 @@ export default function Investments() {
                 <th>Símbolo</th>
                 <th>Moneda</th>
                 <th>Cantidad</th>
-                <th>Precio compra prom.</th>
+                <th className="tx-amount-header">Precio compra</th>
                 <th className="tx-amount-header">Invertido</th>
                 <th></th>
               </tr>

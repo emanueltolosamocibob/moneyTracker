@@ -40,8 +40,10 @@ async function searchWorldSymbols(query: string): Promise<string[]> {
 
 // Búsqueda de símbolos para el campo "Símbolo" en Inversiones — solo
 // devuelve tickers, nunca precio (eso lo sigue cargando el usuario a mano).
-// ARS sale de ByMA (data912, sin key); USD sale de Twelve Data (con key,
-// por eso pasa por acá y no directo desde el cliente).
+// Busca en las dos fuentes siempre, sin importar qué moneda (ARS/USD) esté
+// elegida en el form — esa elección es solo cómo se va a valuar la
+// posición, no una restricción real de qué símbolos existen, así que
+// filtrar la búsqueda por ahí solo escondía resultados válidos.
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'GET') {
     res.status(405).json({ error: 'Method not allowed' })
@@ -54,17 +56,23 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return
   }
 
-  const market = req.query.market === 'world' ? 'world' : 'ar'
   const query = typeof req.query.q === 'string' ? req.query.q.trim() : ''
   if (!query) {
     res.status(200).json({ symbols: [] })
     return
   }
 
-  try {
-    const symbols = market === 'world' ? await searchWorldSymbols(query) : await searchArSymbols(query)
-    res.status(200).json({ symbols })
-  } catch (err) {
-    res.status(502).json({ error: (err as Error).message })
+  const [arResult, worldResult] = await Promise.allSettled([searchArSymbols(query), searchWorldSymbols(query)])
+  const symbols = new Set<string>()
+  if (arResult.status === 'fulfilled') arResult.value.forEach((s) => symbols.add(s))
+  if (worldResult.status === 'fulfilled') worldResult.value.forEach((s) => symbols.add(s))
+
+  // Si las dos fuentes fallaron (ej. Twelve Data caído y ByMA también),
+  // ahí sí es un error real y no una lista vacía silenciosa.
+  if (arResult.status === 'rejected' && worldResult.status === 'rejected') {
+    res.status(502).json({ error: (arResult.reason as Error).message })
+    return
   }
+
+  res.status(200).json({ symbols: Array.from(symbols).sort().slice(0, MAX_RESULTS) })
 }

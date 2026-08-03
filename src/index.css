@@ -457,6 +457,21 @@ body {
   font-family: var(--font-mono);
 }
 
+/* input[type=number] (Inversiones: valor/cantidad de compra/venta) trae de
+   fábrica las flechitas de incremento/decremento — quedan como un chip
+   negro sólido que no matchea nada del resto de la UI y no se puede
+   restylear, así que se ocultan del todo. */
+input[type='number']::-webkit-outer-spin-button,
+input[type='number']::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+input[type='number'] {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
 .tx-field {
   display: flex;
   flex-direction: column;
