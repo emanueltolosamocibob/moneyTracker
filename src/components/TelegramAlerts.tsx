@@ -16,9 +16,13 @@ interface BuyAlert {
   ticker: string
   companyName: string | null
   possibleGainPct: number | null
-  stopLoss: number | null
+  stopLossPct: number | null
   changePct: number | null
   sellBeforeDate: string | null
+  // 'closed' cuando el canal ya mandó una alerta de venta para este símbolo
+  // después de esta compra; 'open' mientras solo hubo la de compra — ver
+  // api/telegram/buy-alerts.ts.
+  status: 'open' | 'closed'
 }
 
 // Tope de vueltas del loop de sincronización. El backfill de un grupo con años
@@ -213,6 +217,7 @@ export default function TelegramAlerts() {
                 <th className="tx-amount-header">Stop loss</th>
                 <th className="tx-amount-header">% desde la alerta</th>
                 <th>Vender antes de</th>
+                <th>Estado</th>
               </tr>
             </thead>
             <tbody>
@@ -222,7 +227,7 @@ export default function TelegramAlerts() {
                   <td className="tx-amount">{alert.ticker}</td>
                   <td>{alert.companyName ?? <span className="tg-muted">—</span>}</td>
                   <td className="tx-amount">{alert.possibleGainPct != null ? `+${alert.possibleGainPct.toFixed(2)}%` : '—'}</td>
-                  <td className="tx-amount">{alert.stopLoss ?? '—'}</td>
+                  <td className="tx-amount">{alert.stopLossPct != null ? `-${alert.stopLossPct.toFixed(2)}%` : '—'}</td>
                   <td className="tx-amount">
                     {alert.changePct != null ? (
                       <span className={alert.changePct >= 0 ? 'tg-hit' : 'tg-miss'}>{formatPct(alert.changePct)}</span>
@@ -233,6 +238,11 @@ export default function TelegramAlerts() {
                     )}
                   </td>
                   <td>{alert.sellBeforeDate ?? <span className="tg-muted">—</span>}</td>
+                  <td>
+                    <span className={`tg-status-badge ${alert.status === 'open' ? 'tg-status-open' : 'tg-status-closed'}`}>
+                      {alert.status === 'open' ? 'Abierta' : 'Cerrada'}
+                    </span>
+                  </td>
                 </tr>
               ))}
             </tbody>
