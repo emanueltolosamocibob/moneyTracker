@@ -91,7 +91,11 @@ export default function PaperTrading() {
     try {
       const headers = await authHeader()
       await fetchLoop('/api/telegram/sync', headers)
-      await fetchLoop('/api/paper/evaluate', headers)
+      // POST a /api/paper/summary, no un endpoint /evaluate aparte: el plan
+      // Hobby de Vercel tope a 12 funciones serverless, así que "evaluar" y
+      // "traer el resumen" comparten archivo (GET/POST) — ver el comentario
+      // en api/paper/summary.ts.
+      await fetchLoop('/api/paper/summary', headers)
       await load()
     } catch (err) {
       setError((err as Error).message)
