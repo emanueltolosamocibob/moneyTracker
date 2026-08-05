@@ -1224,6 +1224,12 @@ input[type='number'] {
   border: 1px solid rgba(255, 255, 255, 0.2);
   color: white;
   box-shadow: 0 20px 50px rgba(0, 0, 0, 0.45);
+  /* .gradient-bg (shared with login/app-shell) sets overflow:hidden for its
+     own reasons, but here it also clips DateField's calendar dropdown
+     (position:absolute, can be taller than a short modal like "Registrar
+     pago") at the modal's bottom edge. The grain texture (::before) is
+     inset:0 within this same box either way, so it doesn't need the clip. */
+  overflow: visible;
 }
 
 .modal-panel-wide {
