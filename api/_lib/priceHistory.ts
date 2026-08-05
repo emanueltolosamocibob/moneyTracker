@@ -13,44 +13,69 @@ export interface DailyClose {
   close: number
 }
 
-interface YahooChartResponse {
-  chart?: {
-    error?: unknown
-    result?: Array<{
-      meta?: { currency?: string }
-      timestamp?: number[]
-      indicators?: { quote?: Array<{ close?: (number | null)[] }> }
-    }>
-  }
+// OHLC completo, no solo el cierre — lo necesita el motor de paper trading
+// (api/_lib/paperTrading.ts) para saber si un stop loss o un take profit se
+// tocó en algún momento del día, no solo si el cierre quedó de un lado o del
+// otro. `resolveSeries`/`createPriceLookup` más abajo siguen trabajando solo
+// con el cierre porque a la evaluación retrospectiva de analyze.ts no le hace
+// falta más.
+export interface DailyBar extends DailyClose {
+  open: number
+  high: number
+  low: number
 }
 
-async function fetchYahoo(ticker: string, fromMs: number, toMs: number): Promise<DailyClose[] | null> {
-  const period1 = Math.floor(fromMs / 1000)
-  const period2 = Math.floor(toMs / 1000)
-  const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ticker)}?period1=${period1}&period2=${period2}&interval=1d`
+interface YahooChartResult {
+  meta?: { currency?: string; regularMarketPrice?: number }
+  timestamp?: number[]
+  indicators?: { quote?: Array<{ open?: (number | null)[]; high?: (number | null)[]; low?: (number | null)[]; close?: (number | null)[] }> }
+}
 
+interface YahooChartResponse {
+  chart?: { error?: unknown; result?: YahooChartResult[] }
+}
+
+async function fetchYahooChart(ticker: string, params: Record<string, string>): Promise<YahooChartResult | null> {
+  const qs = new URLSearchParams(params).toString()
+  const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ticker)}?${qs}`
   try {
     // Sin User-Agent de browser, Yahoo contesta 429/403 a este endpoint.
     const res = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0' } })
     if (!res.ok) return null
     const json = (await res.json()) as YahooChartResponse
-    const result = json.chart?.result?.[0]
-    const timestamps = result?.timestamp
-    const closes = result?.indicators?.quote?.[0]?.close
-    if (!timestamps?.length || !closes?.length) return null
-
-    const series: DailyClose[] = []
-    for (let i = 0; i < timestamps.length; i += 1) {
-      const close = closes[i]
-      // Los feriados y las ruedas sin operaciones vienen como null en el
-      // medio del array, no ausentes — hay que saltearlos explícitamente.
-      if (close == null) continue
-      series.push({ date: new Date(timestamps[i] * 1000).toISOString().slice(0, 10), close })
-    }
-    return series.length > 0 ? series : null
+    return json.chart?.result?.[0] ?? null
   } catch {
     return null
   }
+}
+
+async function fetchYahoo(ticker: string, fromMs: number, toMs: number): Promise<DailyClose[] | null> {
+  const bars = await fetchYahooBars(ticker, fromMs, toMs)
+  return bars ? bars.map(({ date, close }) => ({ date, close })) : null
+}
+
+async function fetchYahooBars(ticker: string, fromMs: number, toMs: number): Promise<DailyBar[] | null> {
+  const result = await fetchYahooChart(ticker, {
+    period1: String(Math.floor(fromMs / 1000)),
+    period2: String(Math.floor(toMs / 1000)),
+    interval: '1d',
+  })
+  const timestamps = result?.timestamp
+  const quote = result?.indicators?.quote?.[0]
+  if (!timestamps?.length || !quote) return null
+
+  const bars: DailyBar[] = []
+  for (let i = 0; i < timestamps.length; i += 1) {
+    const open = quote.open?.[i]
+    const high = quote.high?.[i]
+    const low = quote.low?.[i]
+    const close = quote.close?.[i]
+    // Los feriados y las ruedas sin operaciones vienen como null en el medio
+    // del array, no ausentes — hay que saltearlos explícitamente.
+    if (open == null || high == null || low == null || close == null) continue
+    bars.push({ date: new Date(timestamps[i] * 1000).toISOString().slice(0, 10), open, high, low, close })
+  }
+  return bars.length > 0 ? bars : null
 }
 
 // Las señales del grupo llegan como ticker suelto ("GGAL", "AAPL"), sin decir
@@ -120,4 +145,43 @@ export function createPriceLookup(fromMs: number) {
       worked: action === 'buy' ? changePct > 0 : changePct < 0,
     }
   }
+}
+
+// --- Usado por el motor de paper trading (api/_lib/paperTrading.ts) ---
+//
+// A diferencia de resolveSeries de arriba (pensado para un grupo genérico
+// que puede nombrar papeles de ByMA), las alertas de este canal declaran sus
+// niveles en USD y son casi todas acciones/ADRs de EE.UU. — se prueba el
+// ticker pelado primero y el sufijo .BA solo como fallback (para las pocas
+// alertas de papeles que únicamente cotizan en BCBA, ej. COME).
+
+export interface Quote {
+  symbol: string
+  price: number
+}
+
+function candidateSymbols(symbol: string): string[] {
+  const clean = symbol.trim().toUpperCase()
+  return clean.includes('.') ? [clean] : [clean, `${clean}.BA`]
+}
+
+export async function getQuote(symbol: string): Promise<Quote | null> {
+  for (const candidate of candidateSymbols(symbol)) {
+    const result = await fetchYahooChart(candidate, { range: '1d', interval: '1d' })
+    const price = result?.meta?.regularMarketPrice
+    if (typeof price === 'number' && price > 0) return { symbol: candidate, price }
+  }
+  return null
+}
+
+// Velas diarias desde `since` (inclusive) hasta hoy, con un día de colchón
+// hacia atrás porque Yahoo recorta por timestamp de apertura y sin margen se
+// pierde la vela del propio día de entrada.
+export async function getDailyBars(symbol: string, since: Date): Promise<DailyBar[]> {
+  const fromMs = since.getTime() - 86_400_000
+  for (const candidate of candidateSymbols(symbol)) {
+    const bars = await fetchYahooBars(candidate, fromMs, Date.now())
+    if (bars) return bars
+  }
+  return []
 }
