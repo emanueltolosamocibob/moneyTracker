@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { supabase } from '../lib/supabaseClient'
 import { useAuth } from '../lib/AuthContext'
-import type { Bank, Loan, LoanCurrency, LoanPayment } from '../types/database'
+import type { Bank, Category, Loan, LoanCurrency, LoanPayment } from '../types/database'
 import { IconChevronDown, IconPencil, IconPlus } from '../components/icons'
 import Modal from '../components/Modal'
 import DateField from '../components/DateField'
@@ -68,6 +68,19 @@ function todayDateInput() {
   return new Date().toISOString().slice(0, 10)
 }
 
+// Mismo motivo que dateInputToISO en Transactions.tsx: arma la fecha con
+// año/mes/día sueltos (medianoche local) en vez de parsear el string
+// directo, para que no se corra un día por el desfasaje UTC/Argentina.
+function dateInputToISO(dateStr: string) {
+  const [y, m, d] = dateStr.split('-').map(Number)
+  return new Date(y, m - 1, d).toISOString()
+}
+
+// Nombre fijo de la categoría bajo la que se registran los egresos de
+// cuotas de préstamo (ver handlePaySubmit) — una sola por usuario, creada
+// la primera vez que hace falta.
+const LOAN_PAYMENT_CATEGORY_NAME = 'Préstamos'
+
 // Mismo motivo que en Transactions.tsx/Budgets.tsx/Investments.tsx: armar
 // la fecha con año/mes/día sueltos usa medianoche local, evitando que se
 // corra un día.
@@ -81,6 +94,7 @@ export default function Loans() {
   const [loans, setLoans] = useState<Loan[]>([])
   const [payments, setPayments] = useState<LoanPayment[]>([])
   const [banks, setBanks] = useState<Bank[]>([])
+  const [categories, setCategories] = useState<Category[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -142,14 +156,18 @@ export default function Loans() {
       { data: loansData, error: loansError },
       { data: paymentsData, error: paymentsError },
       { data: banksData, error: banksError },
+      { data: categoriesData, error: categoriesError },
     ] = await Promise.all([
       supabase.from('loans').select('*').order('created_at', { ascending: false }),
       supabase.from('loan_payments').select('*').order('payment_date', { ascending: true }),
       supabase.from('banks').select('*').order('name'),
+      supabase.from('categories').select('*').order('name'),
     ])
 
-    if (loansError || paymentsError || banksError) {
-      setError(loansError?.message ?? paymentsError?.message ?? banksError?.message ?? 'Error al cargar préstamos')
+    if (loansError || paymentsError || banksError || categoriesError) {
+      setError(
+        loansError?.message ?? paymentsError?.message ?? banksError?.message ?? categoriesError?.message ?? 'Error al cargar préstamos',
+      )
       setLoading(false)
       return
     }
@@ -157,7 +175,27 @@ export default function Loans() {
     setLoans(loansData ?? [])
     setPayments(paymentsData ?? [])
     setBanks(banksData ?? [])
+    setCategories(categoriesData ?? [])
     setLoading(false)
+  }
+
+  // Busca la categoría "Préstamos" del usuario, o la crea si es la primera
+  // vez que se registra un pago (ver handlePaySubmit) — mismo patrón que
+  // handleCreateBank de acá abajo, pero disparado automáticamente en vez de
+  // por una acción explícita del usuario en el form.
+  async function getOrCreateLoanCategory(): Promise<string> {
+    const existing = categories.find((c) => c.name === LOAN_PAYMENT_CATEGORY_NAME)
+    if (existing) return existing.id
+
+    const { data, error: insertError } = await supabase
+      .from('categories')
+      .insert({ user_id: user!.id, name: LOAN_PAYMENT_CATEGORY_NAME, icon: 'bank', is_default: false })
+      .select()
+      .single()
+    if (insertError || !data) throw new Error(insertError?.message ?? 'No se pudo crear la categoría "Préstamos".')
+
+    setCategories((prev) => [...prev, data].sort((a, b) => a.name.localeCompare(b.name)))
+    return data.id
   }
 
   useEffect(() => {
@@ -297,13 +335,46 @@ export default function Loans() {
       amount: amountNum,
       uva_value: uvaValue,
     })
-    setPaySaving(false)
 
     if (insertError) {
+      setPaySaving(false)
       setPayError(insertError.message)
       return
     }
 
+    // Cada cuota pagada también se registra como un egreso en Transacciones
+    // — no hay columna que linkee transactions con loan_payments, así que
+    // esto es solo al crear (editar/borrar una cuota no toca la transacción
+    // que generó, quedarían desincronizadas).
+    const installmentNumber = (paymentsByLoan.get(payLoan.id)?.length ?? 0) + 1
+    const bankName = (payLoan.bank_id && bankById.get(payLoan.bank_id)?.name) || 'Sin banco'
+    // El monto del egreso siempre va en pesos: para un préstamo en UVA,
+    // amountNum es cantidad de UVAs, así que hay que convertirlo con el
+    // valor de la UVA del día (uvaValue), igual que paidAmountArs más abajo.
+    const amountArs = payLoan.currency === 'UVA' ? amountNum * (uvaValue ?? 0) : amountNum
+
+    try {
+      const categoryId = await getOrCreateLoanCategory()
+      const { error: txError } = await supabase.from('transactions').insert({
+        user_id: user.id,
+        amount: amountArs,
+        currency: 'ARS',
+        merchant: `Cuota préstamo nro. ${installmentNumber} - ${bankName}`,
+        category_id: categoryId,
+        occurred_at: dateInputToISO(payDate),
+        type: 'expense',
+        source: 'manual',
+        needs_review: false,
+        payment_method: 'transfer',
+      })
+      if (txError) throw new Error(txError.message)
+    } catch (err) {
+      setPaySaving(false)
+      setPayError((err as Error).message)
+      return
+    }
+
+    setPaySaving(false)
     setPayLoan(null)
     load()
   }
