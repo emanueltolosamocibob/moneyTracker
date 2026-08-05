@@ -140,6 +140,144 @@ export interface GmailConnection {
   last_scanned_at: string | null
 }
 
+// Estado de sincronización del grupo de alertas de Telegram. Los mensajes en
+// sí (telegram_messages) no tienen interfaz acá a propósito: el frontend nunca
+// los lee, solo el análisis derivado — ver api/_lib/telegramSync.ts.
+export interface TelegramSyncState {
+  user_id: string
+  chat_id: string
+  chat_title: string | null
+  last_message_id: number | null
+  backfill_cursor: number | null
+  backfill_done: boolean
+  last_synced_at: string | null
+  created_at: string
+}
+
+export interface TelegramSignalOutcome {
+  entryDate: string
+  entryPrice: number
+  lastDate: string
+  lastPrice: number
+  changePct: number
+  worked: boolean
+}
+
+export interface TelegramSignal {
+  symbol: string
+  action: 'buy' | 'sell' | 'hold'
+  date: string
+  target_price: number | null
+  stop_loss: number | null
+  rationale: string
+  confidence: number
+  in_portfolio: boolean
+  // null cuando no se consiguió serie de precios para el símbolo, o cuando la
+  // señal es 'hold' (no hay entrada que evaluar) — ver api/_lib/priceHistory.ts.
+  outcome: TelegramSignalOutcome | null
+}
+
+export interface TelegramAnalysis {
+  id: string
+  user_id: string
+  chat_id: string
+  from_date: string
+  to_date: string
+  message_count: number
+  summary: string
+  signals: TelegramSignal[]
+  created_at: string
+}
+
+// --- Paper trading sobre las mismas alertas (0016_paper_trading.sql) ---
+// Feature distinta de TelegramAnalysis de arriba: esa es análisis
+// retrospectivo ("esta señal después funcionó"), esto es un portfolio
+// simulado que abre/cierra posiciones de verdad (sin dinero real) en
+// paralelo por estrategia — ver api/_lib/paperStrategies.ts.
+
+export type TradeSignalKind = 'buy' | 'sell'
+
+export interface TradeSignal {
+  id: string
+  user_id: string
+  chat_id: string
+  message_id: number
+  posted_at: string
+  kind: TradeSignalKind
+  ticker: string | null
+  take_profit: number | null
+  stop_loss: number | null
+  possible_gain_pct: number | null
+  possible_loss_pct: number | null
+  risk_benefit: number | null
+  reported_result_pct: number | null
+  raw_text: string
+  created_at: string
+}
+
+// Los valores posibles viven en api/_lib/paperStrategies.ts (PAPER_STRATEGIES).
+// string a propósito: agregar una estrategia nueva no debería obligar a
+// tocar el frontend, que solo la muestra con la etiqueta que le llega.
+export type PaperStrategyKey = string
+export type PaperExitReason = 'take_profit' | 'stop_loss' | 'channel_sell' | 'llm' | 'manual'
+
+export interface PaperPosition {
+  id: string
+  user_id: string
+  strategy: PaperStrategyKey
+  signal_id: string
+  ticker: string
+  opened_at: string
+  entry_price: number
+  quantity: number
+  take_profit: number | null
+  stop_loss: number | null
+  status: 'open' | 'closed'
+  closed_at: string | null
+  exit_price: number | null
+  exit_reason: PaperExitReason | null
+  pnl_pct: number | null
+  created_at: string
+  // Solo viene en la respuesta de /api/paper/summary, no es una columna real.
+  current_price?: number | null
+}
+
+export interface PaperDecision {
+  id: string
+  user_id: string
+  position_id: string
+  decided_at: string
+  action: 'hold' | 'sell'
+  price: number | null
+  pnl_pct: number | null
+  confidence: number | null
+  rationale: string | null
+  research: string | null
+  model: string | null
+  created_at: string
+}
+
+export interface PaperStrategyStats {
+  key: string
+  label: string
+  description: string
+  closed: number
+  open: number
+  winRatePct: number | null
+  avgRealizedPct: number | null
+  avgUnrealizedPct: number | null
+  avgTotalPct: number | null
+  totalUsd: number
+}
+
+export interface PaperSummary {
+  notionalUsd: number
+  stats: PaperStrategyStats[]
+  positions: PaperPosition[]
+  signals: TradeSignal[]
+  decisions: PaperDecision[]
+}
+
 // "Foto" de lo gastado por categoría en un mes — ver la migración
 // 0008_category_spend_tracking.sql para por qué category_name/category_color
 // se graban como texto plano en vez de resolverse siempre desde `categories`.
@@ -229,6 +367,36 @@ export interface Database {
         Row: CategoryMonthSpend
         Insert: Partial<CategoryMonthSpend>
         Update: Partial<CategoryMonthSpend>
+        Relationships: []
+      }
+      telegram_sync_state: {
+        Row: TelegramSyncState
+        Insert: Partial<TelegramSyncState>
+        Update: Partial<TelegramSyncState>
+        Relationships: []
+      }
+      telegram_analyses: {
+        Row: TelegramAnalysis
+        Insert: Partial<TelegramAnalysis>
+        Update: Partial<TelegramAnalysis>
+        Relationships: []
+      }
+      trade_signals: {
+        Row: TradeSignal
+        Insert: Partial<TradeSignal>
+        Update: Partial<TradeSignal>
+        Relationships: []
+      }
+      paper_positions: {
+        Row: PaperPosition
+        Insert: Partial<PaperPosition>
+        Update: Partial<PaperPosition>
+        Relationships: []
+      }
+      paper_decisions: {
+        Row: PaperDecision
+        Insert: Partial<PaperDecision>
+        Update: Partial<PaperDecision>
         Relationships: []
       }
     }
