@@ -328,24 +328,28 @@ export default function Loans() {
       }
     }
 
-    const { error: insertError } = await supabase.from('loan_payments').insert({
-      user_id: user.id,
-      loan_id: payLoan.id,
-      payment_date: payDate,
-      amount: amountNum,
-      uva_value: uvaValue,
-    })
+    const { data: newPayment, error: insertError } = await supabase
+      .from('loan_payments')
+      .insert({
+        user_id: user.id,
+        loan_id: payLoan.id,
+        payment_date: payDate,
+        amount: amountNum,
+        uva_value: uvaValue,
+      })
+      .select()
+      .single()
 
-    if (insertError) {
+    if (insertError || !newPayment) {
       setPaySaving(false)
-      setPayError(insertError.message)
+      setPayError(insertError?.message ?? 'No se pudo registrar el pago.')
       return
     }
 
-    // Cada cuota pagada también se registra como un egreso en Transacciones
-    // — no hay columna que linkee transactions con loan_payments, así que
-    // esto es solo al crear (editar/borrar una cuota no toca la transacción
-    // que generó, quedarían desincronizadas).
+    // Cada cuota pagada también se registra como un egreso en Transacciones,
+    // linkeado por loan_payment_id — así editar o borrar la cuota (ver
+    // handleEditPaymentSubmit/handleDeletePayment) puede mantener esta
+    // transacción sincronizada en vez de dejarla huérfana.
     const installmentNumber = (paymentsByLoan.get(payLoan.id)?.length ?? 0) + 1
     const bankName = (payLoan.bank_id && bankById.get(payLoan.bank_id)?.name) || 'Sin banco'
     // El monto del egreso siempre va en pesos: para un préstamo en UVA,
@@ -366,6 +370,7 @@ export default function Loans() {
         source: 'manual',
         needs_review: false,
         payment_method: 'transfer',
+        loan_payment_id: newPayment.id,
       })
       if (txError) throw new Error(txError.message)
     } catch (err) {
@@ -504,10 +509,27 @@ export default function Loans() {
       .from('loan_payments')
       .update({ payment_date: editPaymentDate, amount: amountNum, uva_value: uvaValue })
       .eq('id', editingPayment.id)
-    setEditPaymentSaving(false)
 
     if (updateError) {
+      setEditPaymentSaving(false)
       setEditPaymentError(updateError.message)
+      return
+    }
+
+    // Mantiene la transacción vinculada (ver handlePaySubmit) al día — un
+    // no-op si esta cuota es de antes de que existiera el link
+    // (loan_payment_id null en todas las transacciones, .eq no matchea nada).
+    // El monto va en pesos igual que al crearla; el comercio/categoría no
+    // se tocan porque no cambian al editar.
+    const amountArs = editingPaymentCurrency === 'UVA' ? amountNum * (uvaValue ?? 0) : amountNum
+    const { error: txUpdateError } = await supabase
+      .from('transactions')
+      .update({ amount: amountArs, occurred_at: dateInputToISO(editPaymentDate) })
+      .eq('loan_payment_id', editingPayment.id)
+    setEditPaymentSaving(false)
+
+    if (txUpdateError) {
+      setEditPaymentError(txUpdateError.message)
       return
     }
 
@@ -515,6 +537,9 @@ export default function Loans() {
     load()
   }
 
+  // Borrar la cuota borra en cascada su transacción vinculada (FK
+  // transactions.loan_payment_id on delete cascade, ver la migración
+  // 0017) — no hace falta borrarla a mano acá.
   async function handleDeletePayment(p: LoanPayment) {
     const { error: deleteError } = await supabase.from('loan_payments').delete().eq('id', p.id)
     if (deleteError) {
