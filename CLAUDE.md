@@ -20,8 +20,12 @@ There is no test suite.
 **The `api/**/*.ts` serverless functions are not covered by `npm run build`** (they're outside the Vite/tsconfig.app.json project). Typecheck them manually after touching anything in `api/`:
 
 ```bash
-npx tsc --noEmit --strict --esModuleInterop --skipLibCheck --moduleResolution bundler --module ESNext --target ES2020 --jsx react-jsx api/gmail/connect.ts api/gmail/scan.ts api/cron/scan-gmail.ts api/_lib/*.ts
+npx tsc --noEmit --strict --esModuleInterop --skipLibCheck --moduleResolution bundler --module ESNext --target ES2020 --jsx react-jsx api/**/*.ts
 ```
+
+(Git Bash/zsh need `shopt -s globstar` or an explicit file list for `**` to recurse — if it silently only picks up the top-level files, list the subdirectories by hand: `api/gmail/*.ts api/cron/*.ts api/telegram/*.ts api/paper/*.ts api/investments/*.ts api/uva/*.ts api/_lib/*.ts`.)
+
+**Every file directly under `api/` (excluding `api/_lib/`, which is helpers, not routes) becomes one Vercel serverless function, and the Hobby plan caps a deployment at 12.** Adding a 13th breaks the build outright: *"No more than 12 Serverless Functions can be added to a Deployment on the Hobby plan"* — happened once already (`api/telegram/buy-alerts.ts` was the 13th; fixed by merging `api/paper/evaluate.ts` into `api/paper/summary.ts` via GET/POST on one handler instead of two files). Count with `find api -name "*.ts" -not -path "*/_lib/*" | wc -l` before adding a new route file — if already at 12, fold the new route into an existing one by HTTP method instead of adding a file.
 
 ### Database migrations
 
@@ -98,6 +102,12 @@ Feature distinta de la de arriba, sobre el mismo canal: en vez de análisis retr
 `api/_lib/parseSignal.ts` extrae ticker/take-profit/stop-loss/etc. con regex, no con el LLM — a diferencia de `analyze.ts`, esto no es un grupo genérico: la plantilla de la alerta es fija y se validó a mano contra el histórico completo (100% de las alertas de compra matchean). El LLM se reserva para lo que sí necesita criterio: `api/_lib/evaluatePosition.ts` (estrategia `llm`) corre una búsqueda de noticias del papel y después decide mantener/vender con eso más el precio, las velas y el rango diario promedio del papel como contexto — mismo patrón de dos pasadas y mismo `throttleGeminiCall` compartido que `categorize.ts`/`analyze.ts`. Cada evaluación se guarda en `paper_decisions`, **también cuando la decisión es mantener** — sin eso no habría forma de auditar el criterio, que es justamente lo que este experimento mide.
 
 Las estrategias de regla (`tp3_sl3`, `channel_levels`) se resuelven contra velas diarias OHLC (`getDailyBars` en `priceHistory.ts`, no solo el cierre): un stop se dispara si el mínimo del día lo perfora, aunque el cierre haya quedado arriba — evaluar solo contra cierres infla cualquier estrategia con stop. Se saltea a propósito la vela del propio día de entrada (se compra a mitad de rueda, contar su mínimo dispararía el stop con movimiento anterior a la propia compra) y, cuando una misma vela toca take-profit y stop-loss a la vez, se asume que tocó el stop primero — es la única lectura que no infla el resultado.
+
+**El botón "Traer alertas y evaluar" (`PaperTrading.tsx`) es el camino manual que no depende del listener.** Existe porque el usuario usa varias PCs y ninguna puede tener el listener corriendo siempre — sin este botón, una alerta nueva se queda como texto crudo en `telegram_messages` hasta el cron del día siguiente. Un click hace, en orden: `POST /api/telegram/sync` (trae mensajes nuevos de Telegram) y después `POST /api/paper/summary` (que primero corre `ingestUnprocessedSignals` — el mismo catch-up que usa el cron — y recién después evalúa). Sirve desde cualquier dispositivo logueado, sin credenciales de Telegram de por medio.
+
+**El listener local, para cuando sí hay una máquina prendida, corre bajo pm2** (`ecosystem.config.cjs`, `pm2 start ecosystem.config.cjs && pm2 save && pm2-startup install` — ver `scripts/README.md`). No tiene supervisor propio: una reconexión fallida (visto en producción — un `ENETUNREACH` transitorio) agota los reintentos internos de GramJS y el proceso simplemente muere. pm2 lo reinicia solo (backoff exponencial, tope de reintentos) y `pm2-windows-startup` lo vuelve a levantar si se reinicia Windows.
+
+**Todo este bloque (`TelegramAlerts` + `PaperTrading` en `Investments.tsx`) está oculto detrás de un chequeo de email** (`TELEGRAM_FEATURE_EMAIL` en `Investments.tsx`, hardcodeado — hoy solo existe una cuenta real). Es intencional: la feature está atada a una sola cuenta de Telegram (`TELEGRAM_SESSION`), así que no tiene sentido que la vea un usuario de prueba distinto (p. ej. un tester agregado para probar el login de Google). **Es un gate solo de UI** — los endpoints (`/api/telegram/*`, `/api/paper/*`) siguen respondiendo a cualquier JWT válido; no exponen datos ajenos (todo sigue escopeado por `user_id`), pero si otra cuenta llamara a `/api/telegram/sync` sí dispararía un sync real contra el mismo canal bajo su propio `user_id`. Si en algún momento hay más de una cuenta real usando la app, esto necesita un candado del lado del servidor también, no solo ocultar el componente.
 
 ### UI conventions: colors, fonts, buttons, inputs, dialogs, scrollbars
 
