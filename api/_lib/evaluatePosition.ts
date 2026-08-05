@@ -130,5 +130,9 @@ Criterios:
 - Si la única razón para vender es que el precio tocó un número redondo, mantené.`,
   })
 
-  return { ...object, research, model: MODEL }
+  // Desestructurado explícito, no spread: el build de Vercel usa una versión
+  // de TypeScript más nueva que infiere el `object` de generateObject como
+  // parcialmente opcional, y `{ ...object, research, model }` heredaba esa
+  // opcionalidad — tipaba bien local pero fallaba en el build real.
+  return { action: object.action, confidence: object.confidence, rationale: object.rationale, research, model: MODEL }
 }
