@@ -4,12 +4,11 @@ import { useAuth } from '../lib/AuthContext'
 import type { PaperSummary, PaperPosition, PaperDecision } from '../types/database'
 import { IconRefresh, IconTrendingUp } from './icons'
 
-// Tope de vueltas del loop de evaluación: el server acota cuántas posiciones
-// discrecionales evalúa por invocación (LLM_BATCH_SIZE en paperTrading.ts) y
-// devuelve hasMore, mismo patrón que el escaneo de Gmail y el sync de
-// Telegram — esto solo evita un loop infinito si el server devolviera
-// hasMore para siempre por un bug.
-const MAX_EVALUATE_ROUNDS = 50
+// Tope de vueltas de cada loop (sync y evaluación): el server acota cuánto
+// hace por invocación y devuelve hasMore mientras quede trabajo, mismo
+// patrón que el escaneo de Gmail — esto solo evita un loop infinito si el
+// server devolviera hasMore para siempre por un bug.
+const MAX_ROUNDS = 50
 
 function formatUsd(amount: number) {
   return amount.toLocaleString('es-AR', { style: 'currency', currency: 'USD', minimumFractionDigits: 2, maximumFractionDigits: 2 })
@@ -67,23 +66,32 @@ export default function PaperTrading() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user])
 
+  async function fetchLoop(url: string, headers: Record<string, string>) {
+    let hasMore = true
+    let rounds = 0
+    while (hasMore && rounds < MAX_ROUNDS) {
+      rounds += 1
+      const res = await fetch(url, { method: 'POST', headers })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error ?? `Falló ${url}`)
+      hasMore = json.result?.hasMore ?? false
+    }
+  }
+
+  // Este único botón hace todo el pipeline manual: trae mensajes nuevos de
+  // Telegram, los convierte en señales/posiciones, y evalúa lo que ya está
+  // abierto. Antes "Evaluar ahora" solo hacía el último paso, asumiendo que
+  // el listener local (o el cron de la noche) ya se habían encargado del
+  // resto — pero eso deja de servir si el usuario cambia entre varias PCs y
+  // ninguna tiene el listener corriendo. Con este botón alcanza, desde
+  // cualquier dispositivo, sin depender de un proceso siempre prendido.
   async function handleEvaluate() {
     setEvaluating(true)
     setError(null)
     try {
       const headers = await authHeader()
-      // El server evalúa las posiciones discrecionales de a tandas (cada una
-      // cuesta 2 llamadas a Gemini) y devuelve hasMore mientras queden —
-      // mismo patrón que el escaneo de Gmail y el sync de Telegram.
-      let hasMore = true
-      let rounds = 0
-      while (hasMore && rounds < MAX_EVALUATE_ROUNDS) {
-        rounds += 1
-        const res = await fetch('/api/paper/evaluate', { method: 'POST', headers })
-        const json = await res.json()
-        if (!res.ok) throw new Error(json.error ?? 'No se pudo evaluar el portfolio')
-        hasMore = json.result?.hasMore ?? false
-      }
+      await fetchLoop('/api/telegram/sync', headers)
+      await fetchLoop('/api/paper/evaluate', headers)
       await load()
     } catch (err) {
       setError((err as Error).message)
@@ -118,17 +126,24 @@ export default function PaperTrading() {
       <div className="tx-header">
         <h3>Portfolio simulado</h3>
         <div className="tg-actions">
-          <button type="button" className="gmail-scan-btn" onClick={handleEvaluate} disabled={evaluating}>
-            <IconTrendingUp size={16} /> {evaluating ? 'Evaluando...' : 'Evaluar ahora'}
+          <button
+            type="button"
+            className="gmail-scan-btn"
+            onClick={handleEvaluate}
+            disabled={evaluating}
+            title="Trae mensajes nuevos de Telegram, abre posiciones para alertas de compra nuevas y evalúa las que ya están abiertas"
+          >
+            <IconTrendingUp size={16} /> {evaluating ? 'Trayendo alertas y evaluando...' : 'Traer alertas y evaluar'}
           </button>
-          <button type="button" className="gmail-scan-btn" onClick={load} disabled={loading}>
+          <button type="button" className="gmail-scan-btn" onClick={load} disabled={loading} title="Solo vuelve a leer lo que ya está guardado, sin tocar Telegram ni el modelo">
             <IconRefresh /> Actualizar
           </button>
         </div>
       </div>
       <p className="tg-meta">
         Cada alerta de compra abre la misma posición (US$ {summary?.notionalUsd ?? 1000} simulados) en varias estrategias a la vez, incluida
-        SPY como benchmark — es lo único que permite saber si el criterio del modelo aporta algo. Sin dinero real.
+        SPY como benchmark — es lo único que permite saber si el criterio del modelo aporta algo. Sin dinero real. "Traer alertas y evaluar" hace
+        todo el proceso manual (sirve desde cualquier PC, sin depender de que el listener esté corriendo); "Actualizar" solo refresca la pantalla.
       </p>
 
       {error && <p className="error">{error}</p>}
