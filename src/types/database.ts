@@ -44,6 +44,10 @@ export interface Transaction {
   category_confidence: number | null
   needs_review: boolean
   seen: boolean
+  // Cuota de préstamo que generó esta transacción (ver Loans.tsx), null para
+  // cualquier otra transacción. on delete cascade en la FK: borrar el
+  // loan_payment (o el préstamo entero) borra también esta fila.
+  loan_payment_id: string | null
   created_at: string
 }
 
