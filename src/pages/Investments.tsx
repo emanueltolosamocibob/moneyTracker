@@ -9,6 +9,17 @@ import DateField from '../components/DateField'
 import TelegramAlerts from '../components/TelegramAlerts'
 import PaperTrading from '../components/PaperTrading'
 
+// El bloque de alertas de Telegram / portfolio simulado está atado a una
+// sola cuenta de Telegram (TELEGRAM_SESSION, ver CLAUDE.md) y no es
+// multi-tenant como el resto de la app — si otro usuario lo usara,
+// dispararía sync/evaluate contra el mismo canal bajo su propio user_id en
+// vez de ver nada ajeno (los datos siguen aislados por RLS), pero no tiene
+// sentido que lo vea. Se oculta por email en vez de un rol en la base
+// porque es la única cuenta que existe hoy — si esto crece a más de un
+// usuario real, esto debería moverse a una tabla de flags en vez de un
+// string hardcodeado.
+const TELEGRAM_FEATURE_EMAIL = 'tolosaema11@gmail.com'
+
 const MARKET_CURRENCY: Record<InvestmentMarket, string> = {
   ar: 'ARS',
   world: 'USD',
@@ -616,9 +627,13 @@ export default function Investments() {
         </div>
       )}
 
-      <TelegramAlerts />
+      {user?.email === TELEGRAM_FEATURE_EMAIL && (
+        <>
+          <TelegramAlerts />
 
-      <PaperTrading />
+          <PaperTrading />
+        </>
+      )}
 
       {sellHolding && (
         <Modal>
