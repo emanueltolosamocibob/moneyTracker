@@ -2297,6 +2297,26 @@ input[type='number'] {
   color: rgba(255, 255, 255, 0.4);
 }
 
+/* Mismo recipe visual que .loan-badge-done (pill translúcida), acá para
+   abierta/cerrada en vez de finalizado/en curso. */
+.tg-status-badge {
+  display: inline-block;
+  padding: 0.15rem 0.5rem;
+  border-radius: var(--radius);
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.tg-status-open {
+  background: rgba(74, 222, 128, 0.18);
+  color: var(--income);
+}
+
+.tg-status-closed {
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.55);
+}
+
 .tg-badge {
   display: inline-block;
   margin-left: 0.5rem;

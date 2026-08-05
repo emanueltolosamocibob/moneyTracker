@@ -37,7 +37,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const admin = supabaseAdmin()
   const { data: signals, error } = await admin
     .from('trade_signals')
-    .select('posted_at, ticker, possible_gain_pct, stop_loss, raw_text')
+    .select('posted_at, ticker, possible_gain_pct, possible_loss_pct, raw_text')
     .eq('user_id', userId)
     .eq('chat_id', chatId)
     .eq('kind', 'buy')
@@ -47,6 +47,49 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (error) {
     res.status(500).json({ error: error.message })
     return
+  }
+
+  // Para "abierta"/"cerrada" hace falta ver también las alertas de venta, y
+  // no solo dentro de la ventana pedida: una compra de hace 89 días con venta
+  // hace 2 tiene que verse cerrada aunque se esté mirando "30 días". Por eso
+  // esta segunda consulta no filtra por fecha, solo trae lo mínimo (ticker,
+  // kind, posted_at) de todo el historial del canal.
+  const { data: allSignals, error: allError } = await admin
+    .from('trade_signals')
+    .select('ticker, kind, posted_at')
+    .eq('user_id', userId)
+    .eq('chat_id', chatId)
+    .not('ticker', 'is', null)
+    .order('posted_at', { ascending: true })
+
+  if (allError) {
+    res.status(500).json({ error: allError.message })
+    return
+  }
+
+  // Recorre el historial completo por símbolo en orden cronológico: cada
+  // compra abre una posición (si ya había una abierta, una nueva compra del
+  // mismo símbolo no abre una segunda, se toma como ampliar la misma), cada
+  // venta cierra la posición abierta más reciente de ese símbolo. Guarda el
+  // posted_at exacto de las compras que quedaron cerradas — eso es lo que
+  // se busca abajo para cada fila de la tabla.
+  const closedBuyTimestamps = new Set<string>()
+  const eventsByTicker = new Map<string, { kind: string; posted_at: string }[]>()
+  for (const s of allSignals ?? []) {
+    const list = eventsByTicker.get(s.ticker!) ?? []
+    list.push({ kind: s.kind, posted_at: s.posted_at })
+    eventsByTicker.set(s.ticker!, list)
+  }
+  for (const [ticker, events] of eventsByTicker) {
+    let openBuyAt: string | null = null
+    for (const ev of events) {
+      if (ev.kind === 'buy') {
+        if (!openBuyAt) openBuyAt = ev.posted_at
+      } else if (ev.kind === 'sell' && openBuyAt) {
+        closedBuyTimestamps.add(`${ticker}|${openBuyAt}`)
+        openBuyAt = null
+      }
+    }
   }
 
   // El precio de entrada se toma a la fecha de la alerta (primera rueda en o
@@ -65,9 +108,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           ticker: s.ticker!,
           companyName,
           possibleGainPct: s.possible_gain_pct,
-          stopLoss: s.stop_loss,
+          stopLossPct: s.possible_loss_pct,
           changePct: outcome?.changePct ?? null,
           sellBeforeDate,
+          status: closedBuyTimestamps.has(`${s.ticker}|${s.posted_at}`) ? 'closed' : 'open',
         }
       }),
   )
