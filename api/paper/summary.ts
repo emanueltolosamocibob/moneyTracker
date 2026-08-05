@@ -2,14 +2,24 @@ import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { getUserIdFromRequest, supabaseAdmin } from '../_lib/supabaseAdmin.js'
 import { getQuote } from '../_lib/priceHistory.js'
 import { PAPER_NOTIONAL_USD, PAPER_STRATEGIES } from '../_lib/paperStrategies.js'
+import { evaluateOpenPositions, ingestUnprocessedSignals } from '../_lib/paperTrading.js'
 
-// Todo lo que la sección de portfolio simulado necesita en Inversiones, en
-// una sola respuesta.
+// GET: todo lo que la sección de portfolio simulado necesita en Inversiones,
+// en una sola respuesta. POST: botón "Traer alertas y evaluar" — corre la
+// misma pasada que el cron diario (catch-up de mensajes + evaluación de
+// posiciones abiertas), pero solo para el usuario logueado y al toque.
 //
-// El cálculo vive del lado del servidor porque valuar las posiciones
-// abiertas necesita cotizaciones de Yahoo, y ese endpoint no manda cabeceras
-// CORS — no se puede pedir desde el browser. Además así cada ticker abierto
-// se cotiza una sola vez por invocación, en vez de una request por posición.
+// Los dos comparten archivo (y no dos funciones separadas) porque el plan
+// Hobby de Vercel tope a 12 funciones serverless por deploy — agregar
+// buy-alerts.ts (ver api/telegram/buy-alerts.ts) pasó el proyecto a 13 y
+// rompió el build ("No more than 12 Serverless Functions"). GET/POST en un
+// mismo handler no cuenta como dos funciones.
+//
+// El cálculo del GET vive del lado del servidor porque valuar las
+// posiciones abiertas necesita cotizaciones de Yahoo, y ese endpoint no
+// manda cabeceras CORS — no se puede pedir desde el browser. Además así
+// cada ticker abierto se cotiza una sola vez por invocación, en vez de una
+// request por posición.
 
 interface StrategyStats {
   key: string
@@ -31,6 +41,32 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const userId = await getUserIdFromRequest(req.headers.authorization)
   if (!userId) {
     res.status(401).json({ error: 'Unauthorized' })
+    return
+  }
+
+  if (req.method === 'POST') {
+    // Antes esto era un endpoint aparte que solo evaluaba posiciones ya
+    // abiertas — asumía que algo más (el listener local, o el cron de las
+    // 22:30) ya había convertido mensajes nuevos de Telegram en señales.
+    // Eso se rompe si el usuario usa varias PCs y ninguna tiene el listener
+    // corriendo: sin él, una alerta de compra nueva se queda como texto
+    // crudo hasta el cron del día siguiente. Por eso primero hace catch-up
+    // (ingestUnprocessedSignals) y recién después evalúa — un click desde
+    // cualquier dispositivo alcanza para todo el pipeline. Devuelve
+    // `hasMore` cuando quedaron posiciones discrecionales sin evaluar en
+    // esta tanda; el cliente repite hasta que llegue en false, mismo patrón
+    // que el escaneo de Gmail y el sync de Telegram.
+    const admin = supabaseAdmin()
+    try {
+      const { data: states } = await admin.from('telegram_sync_state').select('chat_id').eq('user_id', userId)
+      for (const state of states ?? []) {
+        await ingestUnprocessedSignals(admin, userId, state.chat_id)
+      }
+      const result = await evaluateOpenPositions(admin, userId)
+      res.status(200).json({ result })
+    } catch (err) {
+      res.status(500).json({ error: (err as Error).message })
+    }
     return
   }
 
