@@ -85,6 +85,8 @@ Env vars necesarias: `TELEGRAM_API_ID`, `TELEGRAM_API_HASH` (de my.telegram.org)
 
 El frontend nunca lee `telegram_messages` — solo el análisis derivado (decisión de producto: menos datos de terceros a la vista).
 
+**La tabla de alertas de compra que ve el usuario NO sale de `analyze.ts`.** `analyze.ts` manda hasta `MAX_MESSAGES=300` mensajes de chat crudo a un LLM, y con ~13 mensajes/día de charla en este canal esos 300 son apenas ~3 semanas — elegir "1 año" en el selector de período no cambiaba nada, siempre se veía "este mes". `api/telegram/buy-alerts.ts` lee directo de `trade_signals` (ya parseado por regex al ingerir, ver `api/_lib/parseSignal.ts` — el mismo pipeline que alimenta el paper trading) sin ese límite ni costo de LLM, y arma la fila con `extractDisplayFields` (nombre de compañía y fecha "vender antes de", ambos re-derivados de `raw_text`, no columnas propias) más el `% desde la alerta` vía `createPriceLookup`. `analyze.ts` sigue existiendo solo para el resumen narrativo (botón "Analizar"), no para la tabla.
+
 ### Paper trading sobre alertas de Telegram (portfolio simulado)
 
 Feature distinta de la de arriba, sobre el mismo canal: en vez de análisis retrospectivo ("esta señal después funcionó"), abre y cierra posiciones simuladas de verdad — sin dinero real — apenas llega una alerta, y las mantiene en cartera hasta que algo (una regla, el canal, o el propio modelo) decide salir.

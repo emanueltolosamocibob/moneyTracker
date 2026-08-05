@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabaseClient'
 import { useAuth } from '../lib/AuthContext'
-import type { TelegramAnalysis, TelegramSignal, TelegramSyncState } from '../types/database'
+import type { TelegramAnalysis, TelegramSyncState } from '../types/database'
 import { IconRefresh, IconTrendingUp } from './icons'
 import Modal from './Modal'
 
@@ -11,15 +11,15 @@ const PERIODS = [
   { days: 365, label: '1 año' },
 ]
 
-const ACTION_LABEL: Record<TelegramSignal['action'], string> = {
-  buy: 'Compra',
-  sell: 'Venta',
-  hold: 'Mantener',
+interface BuyAlert {
+  date: string
+  ticker: string
+  companyName: string | null
+  possibleGainPct: number | null
+  stopLoss: number | null
+  changePct: number | null
+  sellBeforeDate: string | null
 }
-
-// Mismo umbral que needs_review en las transacciones de Gmail: por debajo de
-// esto la extracción es dudosa y se marca, no se esconde.
-const LOW_CONFIDENCE = 0.6
 
 // Tope de vueltas del loop de sincronización. El backfill de un grupo con años
 // de historial son muchas invocaciones (ver MAX_PAGES_PER_RUN en
@@ -40,12 +40,19 @@ export default function TelegramAlerts() {
   const { user } = useAuth()
   const [syncState, setSyncState] = useState<TelegramSyncState | null>(null)
   const [analysis, setAnalysis] = useState<TelegramAnalysis | null>(null)
+  const [buyAlerts, setBuyAlerts] = useState<BuyAlert[] | null>(null)
   const [days, setDays] = useState(90)
   const [loading, setLoading] = useState(true)
+  const [alertsLoading, setAlertsLoading] = useState(true)
   const [syncing, setSyncing] = useState(false)
   const [syncProgress, setSyncProgress] = useState(0)
   const [analyzing, setAnalyzing] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  async function authHeader() {
+    const { data } = await supabase.auth.getSession()
+    return { Authorization: `Bearer ${data.session?.access_token}` }
+  }
 
   async function load() {
     if (!user) return
@@ -59,15 +66,36 @@ export default function TelegramAlerts() {
     setLoading(false)
   }
 
+  // Tabla de alertas de compra: se lee directo de trade_signals (ya parseado
+  // por regex al ingerir, ver api/telegram/buy-alerts.ts), no del análisis
+  // del LLM — sin el límite de 300 mensajes que hacía que "1 año" mostrara
+  // siempre lo mismo que "30 días". Se recarga sola al cambiar el período,
+  // sin costo de LLM.
+  async function loadBuyAlerts() {
+    if (!user) return
+    setAlertsLoading(true)
+    try {
+      const headers = await authHeader()
+      const res = await fetch(`/api/telegram/buy-alerts?days=${days}`, { headers })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error ?? 'No se pudieron cargar las alertas')
+      setBuyAlerts(json.alerts as BuyAlert[])
+    } catch (err) {
+      setError((err as Error).message)
+    } finally {
+      setAlertsLoading(false)
+    }
+  }
+
   useEffect(() => {
     load()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user])
 
-  async function authHeader() {
-    const { data } = await supabase.auth.getSession()
-    return { Authorization: `Bearer ${data.session?.access_token}` }
-  }
+  useEffect(() => {
+    loadBuyAlerts()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, days])
 
   async function handleSync() {
     setSyncing(true)
@@ -91,6 +119,7 @@ export default function TelegramAlerts() {
         setSyncProgress(total)
       }
       await load()
+      await loadBuyAlerts()
     } catch (err) {
       setError((err as Error).message)
     } finally {
@@ -117,18 +146,6 @@ export default function TelegramAlerts() {
       setAnalyzing(false)
     }
   }
-
-  const signals = useMemo(() => {
-    const list = analysis?.signals ?? []
-    // Más recientes primero: una alerta de ayer importa más que una de hace
-    // ocho meses, aunque la de ocho meses tenga rendimiento más interesante.
-    return [...list].sort((a, b) => b.date.localeCompare(a.date))
-  }, [analysis])
-
-  const scoreboard = useMemo(() => {
-    const evaluated = signals.filter((s) => s.outcome)
-    return { total: evaluated.length, hits: evaluated.filter((s) => s.outcome?.worked).length }
-  }, [signals])
 
   return (
     <section className="tg-section">
@@ -167,80 +184,60 @@ export default function TelegramAlerts() {
 
       {loading ? (
         <p>Cargando...</p>
-      ) : !analysis ? (
-        <p className="empty-state">
-          {syncState
-            ? 'Todavía no generaste un análisis. Elegí un período y tocá Analizar.'
-            : 'Sincronizá el grupo de alertas para empezar.'}
-        </p>
       ) : (
-        <>
+        analysis && (
           <div className="tg-summary">
             <p>{analysis.summary}</p>
             <p className="tg-meta">
               {analysis.message_count} mensajes · {formatDate(analysis.from_date)} a {formatDate(analysis.to_date)}
-              {scoreboard.total > 0 && ` · ${scoreboard.hits} de ${scoreboard.total} señales evaluadas acertaron`}
             </p>
           </div>
+        )
+      )}
 
-          {signals.length === 0 ? (
-            <p className="empty-state">No se detectaron señales de compra o venta en este período.</p>
-          ) : (
-            <div className="tx-table-scroll">
-              <table className="tx-table">
-                <thead>
-                  <tr>
-                    <th>Fecha</th>
-                    <th>Símbolo</th>
-                    <th>Acción</th>
-                    <th>Objetivo</th>
-                    <th>Desde la señal</th>
-                    <th>Motivo</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {signals.map((signal, i) => (
-                    <tr key={`${signal.symbol}-${signal.date}-${i}`}>
-                      <td>{formatDate(signal.date)}</td>
-                      <td>
-                        {/* Mismo indicador que las transacciones de baja
-                            confianza, por consistencia. */}
-                        {signal.confidence < LOW_CONFIDENCE && (
-                          <span className="review-dot" title="El modelo no está seguro de que esto sea una recomendación" />
-                        )}
-                        <span className="tx-amount">{signal.symbol}</span>
-                        {signal.in_portfolio && <span className="tg-badge">en cartera</span>}
-                      </td>
-                      <td className={`tg-action tg-action-${signal.action}`}>{ACTION_LABEL[signal.action]}</td>
-                      <td className="tx-amount">{signal.target_price ?? '—'}</td>
-                      <td className="tx-amount">
-                        {signal.outcome ? (
-                          <span className={signal.outcome.worked ? 'tg-hit' : 'tg-miss'}>
-                            {formatPct(signal.outcome.changePct)}
-                          </span>
-                        ) : (
-                          <span
-                            className="tg-muted"
-                            title={
-                              signal.action === 'hold'
-                                ? 'Las señales de mantener no tienen precio de entrada que evaluar'
-                                : 'No se consiguió serie de precios para este símbolo'
-                            }
-                          >
-                            —
-                          </span>
-                        )}
-                      </td>
-                      <td className="tg-rationale" title={signal.rationale}>
-                        {signal.rationale}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </>
+      {alertsLoading ? (
+        <p>Cargando alertas...</p>
+      ) : !buyAlerts || buyAlerts.length === 0 ? (
+        <p className="empty-state">
+          {syncState ? 'No hay alertas de compra en este período.' : 'Sincronizá el grupo de alertas para empezar.'}
+        </p>
+      ) : (
+        <div className="tx-table-scroll">
+          <table className="tx-table">
+            <thead>
+              <tr>
+                <th>Fecha</th>
+                <th>Símbolo</th>
+                <th>Compañía</th>
+                <th className="tx-amount-header">Ganancia estimada</th>
+                <th className="tx-amount-header">Stop loss</th>
+                <th className="tx-amount-header">% desde la alerta</th>
+                <th>Vender antes de</th>
+              </tr>
+            </thead>
+            <tbody>
+              {buyAlerts.map((alert, i) => (
+                <tr key={`${alert.ticker}-${alert.date}-${i}`}>
+                  <td>{formatDate(alert.date)}</td>
+                  <td className="tx-amount">{alert.ticker}</td>
+                  <td>{alert.companyName ?? <span className="tg-muted">—</span>}</td>
+                  <td className="tx-amount">{alert.possibleGainPct != null ? `+${alert.possibleGainPct.toFixed(2)}%` : '—'}</td>
+                  <td className="tx-amount">{alert.stopLoss ?? '—'}</td>
+                  <td className="tx-amount">
+                    {alert.changePct != null ? (
+                      <span className={alert.changePct >= 0 ? 'tg-hit' : 'tg-miss'}>{formatPct(alert.changePct)}</span>
+                    ) : (
+                      <span className="tg-muted" title="No se consiguió serie de precios para este símbolo">
+                        —
+                      </span>
+                    )}
+                  </td>
+                  <td>{alert.sellBeforeDate ?? <span className="tg-muted">—</span>}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
 
       {syncing && (
