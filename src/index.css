@@ -2249,6 +2249,43 @@ input[type='number'] {
   margin: 0.75rem 0;
 }
 
+.tg-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem 1.5rem;
+}
+
+/* "Exportar PDF" (ver TelegramAlerts.tsx handleExportPdf) usa el diálogo de
+   impresión nativo en vez de sumar una librería tipo jspdf — acá se oculta
+   todo menos la tabla, que además se libera del overflow-x:auto que tiene
+   en pantalla (ahí sirve para no romper el layout con .app-shell, pero acá
+   solo la achicaría de más) y pasa a apaisado, que le entra mejor a 8
+   columnas que una hoja vertical. */
+@media print {
+  body * {
+    visibility: hidden;
+  }
+
+  .tg-print,
+  .tg-print * {
+    visibility: visible;
+  }
+
+  .tg-print {
+    position: absolute;
+    inset: 0;
+    overflow: visible;
+  }
+
+  .tg-print table {
+    width: 100%;
+  }
+
+  @page {
+    size: landscape;
+  }
+}
+
 .tg-meta {
   color: rgba(255, 255, 255, 0.65);
   font-size: 0.85rem;
