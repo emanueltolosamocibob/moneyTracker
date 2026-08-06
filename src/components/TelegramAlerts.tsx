@@ -18,7 +18,9 @@ interface BuyAlert {
   possibleGainPct: number | null
   stopLossPct: number | null
   changePct: number | null
-  sellBeforeDate: string | null
+  // Fecha de la alerta de venta que cerró esta compra (null mientras sigue
+  // abierta) — no la fecha "sugerida" que trae la propia alerta de compra.
+  sellDate: string | null
   // 'closed' cuando el canal ya mandó una alerta de venta para este símbolo
   // después de esta compra; 'open' mientras solo hubo la de compra — ver
   // api/telegram/buy-alerts.ts.
@@ -216,7 +218,7 @@ export default function TelegramAlerts() {
                 <th className="tx-amount-header">Ganancia estimada</th>
                 <th className="tx-amount-header">Stop loss</th>
                 <th className="tx-amount-header">% desde la alerta</th>
-                <th>Vender antes de</th>
+                <th>Fecha de venta</th>
                 <th>Estado</th>
               </tr>
             </thead>
@@ -225,9 +227,9 @@ export default function TelegramAlerts() {
                 <tr key={`${alert.ticker}-${alert.date}-${i}`}>
                   <td>{formatDate(alert.date)}</td>
                   <td className="tx-amount">{alert.ticker}</td>
-                  <td>{alert.companyName ?? <span className="tg-muted">—</span>}</td>
+                  <td className="tg-company">{alert.companyName ?? <span className="tg-muted">—</span>}</td>
                   <td className="tx-amount">{alert.possibleGainPct != null ? `+${alert.possibleGainPct.toFixed(2)}%` : '—'}</td>
-                  <td className="tx-amount">{alert.stopLossPct != null ? `-${alert.stopLossPct.toFixed(2)}%` : '—'}</td>
+                  <td className="tx-amount tg-stoploss">{alert.stopLossPct != null ? `-${alert.stopLossPct.toFixed(2)}%` : '—'}</td>
                   <td className="tx-amount">
                     {alert.changePct != null ? (
                       <span className={alert.changePct >= 0 ? 'tg-hit' : 'tg-miss'}>{formatPct(alert.changePct)}</span>
@@ -237,7 +239,7 @@ export default function TelegramAlerts() {
                       </span>
                     )}
                   </td>
-                  <td>{alert.sellBeforeDate ?? <span className="tg-muted">—</span>}</td>
+                  <td>{alert.sellDate ? formatDate(alert.sellDate) : <span className="tg-muted">—</span>}</td>
                   <td>
                     <span className={`tg-status-badge ${alert.status === 'open' ? 'tg-status-open' : 'tg-status-closed'}`}>
                       {alert.status === 'open' ? 'Abierta' : 'Cerrada'}

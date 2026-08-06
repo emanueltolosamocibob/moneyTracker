@@ -70,10 +70,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   // Recorre el historial completo por símbolo en orden cronológico: cada
   // compra abre una posición (si ya había una abierta, una nueva compra del
   // mismo símbolo no abre una segunda, se toma como ampliar la misma), cada
-  // venta cierra la posición abierta más reciente de ese símbolo. Guarda el
-  // posted_at exacto de las compras que quedaron cerradas — eso es lo que
-  // se busca abajo para cada fila de la tabla.
-  const closedBuyTimestamps = new Set<string>()
+  // venta cierra la posición abierta más reciente de ese símbolo. Guarda,
+  // para cada compra que quedó cerrada, el posted_at de la venta que la
+  // cerró — eso es lo que se muestra como "Fecha de venta" en la tabla.
+  const closedBuyToSellDate = new Map<string, string>()
   const eventsByTicker = new Map<string, { kind: string; posted_at: string }[]>()
   for (const s of allSignals ?? []) {
     const list = eventsByTicker.get(s.ticker!) ?? []
@@ -86,7 +86,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       if (ev.kind === 'buy') {
         if (!openBuyAt) openBuyAt = ev.posted_at
       } else if (ev.kind === 'sell' && openBuyAt) {
-        closedBuyTimestamps.add(`${ticker}|${openBuyAt}`)
+        closedBuyToSellDate.set(`${ticker}|${openBuyAt}`, ev.posted_at)
         openBuyAt = null
       }
     }
@@ -101,8 +101,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     (signals ?? [])
       .filter((s) => s.ticker)
       .map(async (s) => {
-        const { companyName, sellBeforeDate } = extractDisplayFields(s.raw_text)
+        const { companyName } = extractDisplayFields(s.raw_text)
         const outcome = await evaluate(s.ticker!, s.posted_at.slice(0, 10), 'buy')
+        const sellDateIso = closedBuyToSellDate.get(`${s.ticker}|${s.posted_at}`) ?? null
         return {
           date: s.posted_at.slice(0, 10),
           ticker: s.ticker!,
@@ -110,8 +111,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           possibleGainPct: s.possible_gain_pct,
           stopLossPct: s.possible_loss_pct,
           changePct: outcome?.changePct ?? null,
-          sellBeforeDate,
-          status: closedBuyTimestamps.has(`${s.ticker}|${s.posted_at}`) ? 'closed' : 'open',
+          sellDate: sellDateIso ? sellDateIso.slice(0, 10) : null,
+          status: sellDateIso ? 'closed' : 'open',
         }
       }),
   )
