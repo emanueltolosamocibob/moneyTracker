@@ -13,12 +13,10 @@ export interface DailyClose {
   close: number
 }
 
-// OHLC completo, no solo el cierre — lo necesita el motor de paper trading
-// (api/_lib/paperTrading.ts) para saber si un stop loss o un take profit se
-// tocó en algún momento del día, no solo si el cierre quedó de un lado o del
-// otro. `resolveSeries`/`createPriceLookup` más abajo siguen trabajando solo
-// con el cierre porque a la tabla de alertas de compra (api/telegram/buy-
-// alerts.ts) no le hace falta más.
+// OHLC completo, no solo el cierre — usado por getDailyBars más abajo.
+// `resolveSeries`/`createPriceLookup` siguen trabajando solo con el cierre
+// porque a la tabla de alertas de compra (api/telegram/buy-alerts.ts) no le
+// hace falta más.
 export interface DailyBar extends DailyClose {
   open: number
   high: number
@@ -155,31 +153,13 @@ export function createPriceLookup(fromMs: number) {
   }
 }
 
-// --- Usado por el motor de paper trading (api/_lib/paperTrading.ts) ---
-//
-// A diferencia de resolveSeries de arriba (pensado para un grupo genérico
-// que puede nombrar papeles de ByMA), las alertas de este canal declaran sus
-// niveles en USD y son casi todas acciones/ADRs de EE.UU. — se prueba el
-// ticker pelado primero y el sufijo .BA solo como fallback (para las pocas
-// alertas de papeles que únicamente cotizan en BCBA, ej. COME).
-
-export interface Quote {
-  symbol: string
-  price: number
-}
-
+// Usado por api/investments/spy-benchmark.ts. A diferencia de resolveSeries
+// de arriba (pensado para un grupo genérico que puede nombrar papeles de
+// ByMA), acá se prueba el ticker pelado primero y el sufijo .BA solo como
+// fallback, para tickers de EE.UU. como SPY.
 function candidateSymbols(symbol: string): string[] {
   const clean = symbol.trim().toUpperCase()
   return clean.includes('.') ? [clean] : [clean, `${clean}.BA`]
-}
-
-export async function getQuote(symbol: string): Promise<Quote | null> {
-  for (const candidate of candidateSymbols(symbol)) {
-    const result = await fetchYahooChart(candidate, { range: '1d', interval: '1d' })
-    const price = result?.meta?.regularMarketPrice
-    if (typeof price === 'number' && price > 0) return { symbol: candidate, price }
-  }
-  return null
 }
 
 // Velas diarias desde `since` (inclusive) hasta hoy, con un día de colchón

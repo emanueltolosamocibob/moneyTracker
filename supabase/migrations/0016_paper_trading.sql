@@ -2,12 +2,10 @@
 -- Paper trading sobre las alertas de Telegram (ver 0015_telegram_alerts.sql
 -- para la ingesta de mensajes cruda, que esto reutiliza).
 --
--- Nada de esto toca dinero real ni las tablas de `investment_lots` /
--- `investment_sales` (la cartera real, cargada a mano). Es un experimento
--- medible: cada alerta de compra abre la MISMA posición simulada en varias
--- estrategias de salida en paralelo — incluida una discrecional donde decide
--- el LLM — y se compara cuál gana. Sin las estrategias de control corriendo
--- al lado, un solo portafolio no permite distinguir criterio de ruido.
+-- `paper_positions` y `paper_decisions`, creadas más abajo, fueron
+-- eliminadas en 0020_drop_paper_trading.sql (portfolio simulado descartado
+-- por decisión de producto). `trade_signals` sigue viva: es la fuente de la
+-- tabla "Alertas de Telegram" (api/telegram/buy-alerts.ts).
 -- ---------------------------------------------------------------------
 
 -- Una alerta de compra/venta ya parseada desde telegram_messages (ver

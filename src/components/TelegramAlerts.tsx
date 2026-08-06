@@ -68,6 +68,17 @@ function formatPct(pct: number) {
   return `${pct > 0 ? '+' : ''}${pct.toFixed(1)}%`
 }
 
+// Mismo parseo local que formatDate (no new Date(dateStr) directo, que
+// interpreta la fecha en UTC y puede dar un día de diferencia según el huso
+// horario del navegador).
+function daysBetween(buyDate: string, sellDate: string) {
+  const [y1, m1, d1] = buyDate.slice(0, 10).split('-').map(Number)
+  const [y2, m2, d2] = sellDate.slice(0, 10).split('-').map(Number)
+  const start = new Date(y1, m1 - 1, d1)
+  const end = new Date(y2, m2 - 1, d2)
+  return Math.round((end.getTime() - start.getTime()) / 86_400_000)
+}
+
 export default function TelegramAlerts() {
   const { user } = useAuth()
   const [syncState, setSyncState] = useState<TelegramSyncState | null>(null)
@@ -92,10 +103,8 @@ export default function TelegramAlerts() {
   const [editError, setEditError] = useState<string | null>(null)
 
   // Confirmación de borrado — se abre desde "Eliminar alerta" en el modal de
-  // edición, no directo, porque borrar una alerta borra en cascada sus
-  // posiciones de paper trading si generó alguna (ver handleDelete en
-  // api/telegram/buy-alerts.ts), a diferencia de otros borrados manuales de
-  // la app que no avisan (ver CLAUDE.md).
+  // edición, no directo, a diferencia de otros borrados manuales de la app
+  // que no avisan (ver CLAUDE.md).
   const [pendingDeleteAlert, setPendingDeleteAlert] = useState<BuyAlert | null>(null)
   const [deletingAlert, setDeletingAlert] = useState(false)
   const [deleteError, setDeleteError] = useState<string | null>(null)
@@ -401,6 +410,7 @@ export default function TelegramAlerts() {
                 <th className="tx-amount-header">Stop loss</th>
                 <th className="tx-amount-header">% desde la alerta</th>
                 <th>Fecha de venta</th>
+                <th className="tx-amount-header">Días</th>
                 <th>Estado</th>
               </tr>
             </thead>
@@ -431,6 +441,7 @@ export default function TelegramAlerts() {
                     )}
                   </td>
                   <td>{alert.sellDate ? formatDate(alert.sellDate) : <span className="tg-muted">—</span>}</td>
+                  <td className="tx-amount">{alert.sellDate ? daysBetween(alert.date, alert.sellDate) : <span className="tg-muted">—</span>}</td>
                   <td>
                     <span className={`tg-status-badge ${alert.status === 'open' ? 'tg-status-open' : 'tg-status-closed'}`}>
                       {alert.status === 'open' ? 'Abierta' : 'Cerrada'}
@@ -544,8 +555,7 @@ export default function TelegramAlerts() {
           <h3>Eliminar alerta</h3>
           <p>
             Se va a eliminar la alerta de compra de &quot;{pendingDeleteAlert.ticker}&quot; del {formatDate(pendingDeleteAlert.date)}.
-            Si generó posiciones de paper trading, esas posiciones y sus evaluaciones también se eliminan. Esta acción no se puede
-            deshacer.
+            Esta acción no se puede deshacer.
           </p>
           {deleteError && <p className="error">{deleteError}</p>}
           <div className="modal-actions">

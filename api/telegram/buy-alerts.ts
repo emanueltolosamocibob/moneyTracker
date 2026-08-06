@@ -8,13 +8,12 @@ const MAX_DAYS = 365
 
 // Tabla de "Alertas de Telegram" en Inversiones: una fila por alerta de
 // compra, con los datos tal como los declaró el canal. Lee directo de
-// `trade_signals` — ya parseado por regex en la ingesta del portfolio
-// simulado (ver api/_lib/parseSignal.ts) — sin costo de LLM.
+// `trade_signals` — ya parseado por regex al sincronizar (ver
+// api/_lib/signalIngest.ts y api/_lib/parseSignal.ts) — sin costo de LLM.
 //
 // PATCH acá mismo en vez de un archivo nuevo (api/telegram/edit-alert.ts):
-// el plan Hobby de Vercel tope a 12 funciones y ya está al límite (ver
-// CLAUDE.md) — un método HTTP más sobre la misma ruta, mismo patrón que
-// api/paper/summary.ts (GET+POST) cuando pasó lo mismo.
+// el plan Hobby de Vercel tope a 12 funciones (ver CLAUDE.md) y no vale la
+// pena gastar una función más por un método HTTP.
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   const userId = await getUserIdFromRequest(req.headers.authorization)
   if (!userId) {
@@ -86,11 +85,7 @@ async function handlePost(req: VercelRequest, res: VercelResponse, userId: strin
   res.status(200).json({ ok: true })
 }
 
-// Solo borra lo que ya es de este usuario y sigue siendo una alerta de
-// compra. paper_positions.signal_id referencia esta tabla con on delete
-// cascade (ver 0016_paper_trading.sql) — si esta alerta abrió posiciones de
-// paper trading, se borran junto con sus evaluaciones (paper_decisions,
-// cascada desde paper_positions). El frontend avisa de esto antes de llamar.
+// Solo borra lo que ya es de este usuario y sigue siendo una alerta de compra.
 async function handleDelete(req: VercelRequest, res: VercelResponse, userId: string, chatId: string) {
   const id = typeof req.query.id === 'string' ? req.query.id : null
   if (!id) {
