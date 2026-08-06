@@ -19,6 +19,7 @@ const STATUS_FILTERS: { value: StatusFilter; label: string }[] = [
 ]
 
 type StatusFilter = 'all' | 'open' | 'closed'
+type PeriodMode = 'preset' | 'custom'
 
 interface BuyAlert {
   id: string
@@ -83,7 +84,10 @@ export default function TelegramAlerts() {
   const { user } = useAuth()
   const [syncState, setSyncState] = useState<TelegramSyncState | null>(null)
   const [buyAlerts, setBuyAlerts] = useState<BuyAlert[] | null>(null)
+  const [periodMode, setPeriodMode] = useState<PeriodMode>('preset')
   const [days, setDays] = useState(90)
+  const [customFrom, setCustomFrom] = useState('')
+  const [customTo, setCustomTo] = useState('')
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
   const [alertsLoading, setAlertsLoading] = useState(true)
   const [syncing, setSyncing] = useState(false)
@@ -132,13 +136,17 @@ export default function TelegramAlerts() {
 
   // Tabla de alertas de compra: se lee directo de trade_signals (ya parseado
   // por regex al ingerir, ver api/telegram/buy-alerts.ts) — sin costo de LLM,
-  // se recarga sola al cambiar el período.
+  // se recarga sola al cambiar el período. En modo "Personalizado" no dispara
+  // hasta tener las dos fechas puestas, para no pegarle al server con una
+  // punta sola.
   async function loadBuyAlerts() {
     if (!user) return
+    if (periodMode === 'custom' && (!customFrom || !customTo)) return
     setAlertsLoading(true)
     try {
       const headers = await authHeader()
-      const res = await fetch(`/api/telegram/buy-alerts?days=${days}`, { headers })
+      const query = periodMode === 'custom' ? `from=${customFrom}&to=${customTo}` : `days=${days}`
+      const res = await fetch(`/api/telegram/buy-alerts?${query}`, { headers })
       const json = await res.json()
       if (!res.ok) throw new Error(json.error ?? 'No se pudieron cargar las alertas')
       setBuyAlerts(json.alerts as BuyAlert[])
@@ -157,7 +165,7 @@ export default function TelegramAlerts() {
   useEffect(() => {
     loadBuyAlerts()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user, days])
+  }, [user, periodMode, days, customFrom, customTo])
 
   const filteredAlerts = useMemo(() => {
     if (!buyAlerts) return null
@@ -358,10 +366,21 @@ export default function TelegramAlerts() {
       <div className="tg-filters">
         <div className="type-toggle tg-period" role="group" aria-label="Período">
           {PERIODS.map((p) => (
-            <button key={p.days} type="button" className={days === p.days ? 'active' : ''} onClick={() => setDays(p.days)}>
+            <button
+              key={p.days}
+              type="button"
+              className={periodMode === 'preset' && days === p.days ? 'active' : ''}
+              onClick={() => {
+                setPeriodMode('preset')
+                setDays(p.days)
+              }}
+            >
               {p.label}
             </button>
           ))}
+          <button type="button" className={periodMode === 'custom' ? 'active' : ''} onClick={() => setPeriodMode('custom')}>
+            Personalizado
+          </button>
         </div>
         <div className="type-toggle tg-period" role="group" aria-label="Filtrar por estado">
           {STATUS_FILTERS.map((f) => (
@@ -377,6 +396,14 @@ export default function TelegramAlerts() {
         </div>
       </div>
 
+      {periodMode === 'custom' && (
+        <div className="budget-custom-range">
+          <DateField value={customFrom} onChange={setCustomFrom} />
+          <span>–</span>
+          <DateField value={customTo} onChange={setCustomTo} />
+        </div>
+      )}
+
       {error && <p className="error">{error}</p>}
 
       {syncState && (
@@ -390,7 +417,9 @@ export default function TelegramAlerts() {
         </p>
       )}
 
-      {alertsLoading ? (
+      {periodMode === 'custom' && (!customFrom || !customTo) ? (
+        <p className="empty-state">Elegí las dos fechas del rango para ver las alertas.</p>
+      ) : alertsLoading ? (
         <p>Cargando alertas...</p>
       ) : !buyAlerts || buyAlerts.length === 0 ? (
         <p className="empty-state">
