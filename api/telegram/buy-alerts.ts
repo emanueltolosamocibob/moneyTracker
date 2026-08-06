@@ -187,20 +187,41 @@ async function handlePatch(req: VercelRequest, res: VercelResponse, userId: stri
   res.status(200).json({ ok: true })
 }
 
+function parseDateParam(value: unknown): string | null {
+  return typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : null
+}
+
 async function handleGet(req: VercelRequest, res: VercelResponse, userId: string, chatId: string) {
-  const requestedDays = Number(req.query.days)
-  const days = Number.isFinite(requestedDays) ? Math.min(Math.max(requestedDays, 1), MAX_DAYS) : DEFAULT_DAYS
-  const fromMs = Date.now() - days * 24 * 60 * 60 * 1000
+  // Rango personalizado (from/to, YYYY-MM-DD) tiene prioridad sobre days: lo
+  // manda el selector "Personalizado" del frontend cuando el usuario elige
+  // fechas puntuales en vez de uno de los períodos fijos.
+  const fromParam = parseDateParam(req.query.from)
+  const toParam = parseDateParam(req.query.to)
+
+  let days: number | null = null
+  let fromMs: number
+  let toMs: number | null = null
+
+  if (fromParam && toParam) {
+    fromMs = new Date(`${fromParam}T00:00:00.000Z`).getTime()
+    toMs = new Date(`${toParam}T23:59:59.999Z`).getTime()
+  } else {
+    const requestedDays = Number(req.query.days)
+    days = Number.isFinite(requestedDays) ? Math.min(Math.max(requestedDays, 1), MAX_DAYS) : DEFAULT_DAYS
+    fromMs = Date.now() - days * 24 * 60 * 60 * 1000
+  }
 
   const admin = supabaseAdmin()
-  const { data: signals, error } = await admin
+  let signalsQuery = admin
     .from('trade_signals')
     .select('id, posted_at, ticker, possible_gain_pct, possible_loss_pct, raw_text, manual_sell_date, reported_result_pct, is_manual')
     .eq('user_id', userId)
     .eq('chat_id', chatId)
     .eq('kind', 'buy')
     .gte('posted_at', new Date(fromMs).toISOString())
-    .order('posted_at', { ascending: false })
+  if (toMs != null) signalsQuery = signalsQuery.lte('posted_at', new Date(toMs).toISOString())
+
+  const { data: signals, error } = await signalsQuery.order('posted_at', { ascending: false })
 
   if (error) {
     res.status(500).json({ error: error.message })
@@ -294,5 +315,5 @@ async function handleGet(req: VercelRequest, res: VercelResponse, userId: string
       }),
   )
 
-  res.status(200).json({ alerts, days })
+  res.status(200).json({ alerts, days, from: fromParam, to: toParam })
 }
