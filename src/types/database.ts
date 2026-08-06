@@ -193,11 +193,12 @@ export interface TelegramAnalysis {
   created_at: string
 }
 
-// --- Paper trading sobre las mismas alertas (0016_paper_trading.sql) ---
-// Feature distinta de TelegramAnalysis de arriba: esa es análisis
-// retrospectivo ("esta señal después funcionó"), esto es un portfolio
-// simulado que abre/cierra posiciones de verdad (sin dinero real) en
-// paralelo por estrategia — ver api/_lib/paperStrategies.ts.
+// Alertas de compra/venta del canal de Telegram, parseadas por regex al
+// sincronizar (ver api/_lib/signalIngest.ts, api/_lib/parseSignal.ts).
+// Originalmente pensada también para alimentar un portfolio simulado
+// (paper trading, 0016_paper_trading.sql) que se eliminó por decisión de
+// producto (0020_drop_paper_trading.sql) — esta tabla sigue siendo la
+// fuente de la tabla "Alertas de Telegram" en Inversiones.
 
 export type TradeSignalKind = 'buy' | 'sell'
 
@@ -226,69 +227,6 @@ export interface TradeSignal {
   // mensaje real de Telegram detrás.
   is_manual: boolean
   created_at: string
-}
-
-// Los valores posibles viven en api/_lib/paperStrategies.ts (PAPER_STRATEGIES).
-// string a propósito: agregar una estrategia nueva no debería obligar a
-// tocar el frontend, que solo la muestra con la etiqueta que le llega.
-export type PaperStrategyKey = string
-export type PaperExitReason = 'take_profit' | 'stop_loss' | 'channel_sell' | 'llm' | 'manual'
-
-export interface PaperPosition {
-  id: string
-  user_id: string
-  strategy: PaperStrategyKey
-  signal_id: string
-  ticker: string
-  opened_at: string
-  entry_price: number
-  quantity: number
-  take_profit: number | null
-  stop_loss: number | null
-  status: 'open' | 'closed'
-  closed_at: string | null
-  exit_price: number | null
-  exit_reason: PaperExitReason | null
-  pnl_pct: number | null
-  created_at: string
-  // Solo viene en la respuesta de /api/paper/summary, no es una columna real.
-  current_price?: number | null
-}
-
-export interface PaperDecision {
-  id: string
-  user_id: string
-  position_id: string
-  decided_at: string
-  action: 'hold' | 'sell'
-  price: number | null
-  pnl_pct: number | null
-  confidence: number | null
-  rationale: string | null
-  research: string | null
-  model: string | null
-  created_at: string
-}
-
-export interface PaperStrategyStats {
-  key: string
-  label: string
-  description: string
-  closed: number
-  open: number
-  winRatePct: number | null
-  avgRealizedPct: number | null
-  avgUnrealizedPct: number | null
-  avgTotalPct: number | null
-  totalUsd: number
-}
-
-export interface PaperSummary {
-  notionalUsd: number
-  stats: PaperStrategyStats[]
-  positions: PaperPosition[]
-  signals: TradeSignal[]
-  decisions: PaperDecision[]
 }
 
 // "Foto" de lo gastado por categoría en un mes — ver la migración
@@ -398,18 +336,6 @@ export interface Database {
         Row: TradeSignal
         Insert: Partial<TradeSignal>
         Update: Partial<TradeSignal>
-        Relationships: []
-      }
-      paper_positions: {
-        Row: PaperPosition
-        Insert: Partial<PaperPosition>
-        Update: Partial<PaperPosition>
-        Relationships: []
-      }
-      paper_decisions: {
-        Row: PaperDecision
-        Insert: Partial<PaperDecision>
-        Update: Partial<PaperDecision>
         Relationships: []
       }
     }

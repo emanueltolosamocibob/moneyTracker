@@ -1,6 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { supabaseAdmin } from '../_lib/supabaseAdmin.js'
 import { syncTelegramForUser, type TelegramSyncResult } from '../_lib/telegramSync.js'
+import { ingestUnprocessedSignals } from '../_lib/signalIngest.js'
 
 // Disparado por Vercel Cron (ver vercel.ts), protegido con CRON_SECRET igual
 // que scan-gmail.
@@ -28,7 +29,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   for (const state of states ?? []) {
     try {
-      results[`${state.user_id}:${state.chat_id}`] = await syncTelegramForUser(admin, state)
+      const result = await syncTelegramForUser(admin, state)
+      await ingestUnprocessedSignals(admin, state.user_id, state.chat_id)
+      results[`${state.user_id}:${state.chat_id}`] = result
     } catch (err) {
       results[`${state.user_id}:${state.chat_id}`] = `error: ${(err as Error).message}`
     }

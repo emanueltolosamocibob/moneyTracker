@@ -1,6 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { getUserIdFromRequest, supabaseAdmin } from '../_lib/supabaseAdmin.js'
 import { syncTelegramForUser, type TelegramSyncState } from '../_lib/telegramSync.js'
+import { ingestUnprocessedSignals } from '../_lib/signalIngest.js'
 
 // Botón "Sincronizar" del bloque de alertas en Inversiones: mismo core que el
 // cron, pero al toque y solo para el usuario logueado.
@@ -8,6 +9,11 @@ import { syncTelegramForUser, type TelegramSyncState } from '../_lib/telegramSyn
 // La fila de telegram_sync_state la crea este endpoint la primera vez, no el
 // cron: acá es donde hay un JWT del que sacar el user_id. El cron después
 // recorre las filas ya existentes (igual que hace con gmail_connections).
+//
+// Después de traer mensajes nuevos, los convierte en señales (trade_signals)
+// vía ingestUnprocessedSignals — antes ese paso lo hacía el pipeline de
+// paper trading (eliminado), así que ahora vive acá para que "Alertas de
+// Telegram" siga recibiendo alertas nuevas sin ese portfolio simulado.
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') {
     res.status(405).json({ error: 'Method not allowed' })
@@ -49,6 +55,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   try {
     const result = await syncTelegramForUser(admin, state)
+    await ingestUnprocessedSignals(admin, userId, chatId)
     res.status(200).json({ result })
   } catch (err) {
     res.status(500).json({ error: (err as Error).message })

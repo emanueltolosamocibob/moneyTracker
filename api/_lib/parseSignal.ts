@@ -38,9 +38,9 @@ function firstMatch(text: string, re: RegExp): string | undefined {
 }
 
 // Campos usados solo para mostrar (la tabla de "Alertas de Telegram" en
-// Inversiones), no para el motor de paper trading — por eso van aparte de
-// ParsedSignal en vez de agregarles columnas a trade_signals: raw_text ya
-// es la fuente de verdad y estos dos siempre se pueden re-derivar de ahí.
+// Inversiones) — van aparte de ParsedSignal en vez de agregarles columnas a
+// trade_signals: raw_text ya es la fuente de verdad y estos dos siempre se
+// pueden re-derivar de ahí.
 export interface DisplayFields {
   companyName: string | null
   // Texto libre tal como lo escribió el canal ("25/02", "27/1/26"): los
