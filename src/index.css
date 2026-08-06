@@ -2285,6 +2285,20 @@ input[type='number'] {
   color: rgba(255, 255, 255, 0.65);
 }
 
+/* Angosta la columna Compañía de la tabla de alertas — nombres largos
+   ("Nu Holdings Ltd") no necesitan tanto lugar como Fecha/Estado, mismo
+   recipe de ellipsis que .tg-rationale más abajo. */
+.tg-company {
+  max-width: 110px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tg-stoploss {
+  color: rgba(255, 255, 255, 0.6);
+}
+
 .tg-hit {
   color: var(--income);
 }
