@@ -37,7 +37,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 }
 
 async function handlePatch(req: VercelRequest, res: VercelResponse, userId: string, chatId: string) {
-  const { id, date, ticker, possibleGainPct, stopLossPct, manualSellDate } = req.body ?? {}
+  const { id, date, ticker, possibleGainPct, stopLossPct, manualSellDate, resultPct } = req.body ?? {}
   if (!id || typeof id !== 'string') {
     res.status(400).json({ error: 'Falta el id de la alerta.' })
     return
@@ -94,6 +94,13 @@ async function handlePatch(req: VercelRequest, res: VercelResponse, userId: stri
       possible_gain_pct: possibleGainPct === '' || possibleGainPct == null ? null : Number(possibleGainPct),
       possible_loss_pct: stopLossPct === '' || stopLossPct == null ? null : Number(stopLossPct),
       manual_sell_date: manualSellDate === '' || manualSellDate == null ? null : manualSellDate,
+      // Reusa reported_result_pct: en una fila kind='sell' es el % que el
+      // canal reportó en su propio mensaje de venta; en kind='buy' (esta
+      // ruta solo edita compras) nunca lo pobló el parser, así que queda
+      // libre para el resultado real cargado a mano cuando Yahoo no tiene
+      // serie para el símbolo y el cálculo automático da null (ver
+      // handleGet) — no hizo falta agregar una columna nueva.
+      reported_result_pct: resultPct === '' || resultPct == null ? null : Number(resultPct),
     })
     .eq('id', id)
     .eq('user_id', userId)
@@ -114,7 +121,7 @@ async function handleGet(req: VercelRequest, res: VercelResponse, userId: string
   const admin = supabaseAdmin()
   const { data: signals, error } = await admin
     .from('trade_signals')
-    .select('id, posted_at, ticker, possible_gain_pct, possible_loss_pct, raw_text, manual_sell_date')
+    .select('id, posted_at, ticker, possible_gain_pct, possible_loss_pct, raw_text, manual_sell_date, reported_result_pct')
     .eq('user_id', userId)
     .eq('chat_id', chatId)
     .eq('kind', 'buy')
@@ -189,6 +196,11 @@ async function handleGet(req: VercelRequest, res: VercelResponse, userId: string
         // venta, no hasta hoy. Abierta: sigue siendo hasta hoy (asOfDate
         // undefined), que es el comportamiento que ya tenía.
         const outcome = await evaluate(s.ticker!, s.posted_at.slice(0, 10), 'buy', sellDate ?? undefined)
+        // Un resultado cargado a mano (ver handlePatch) manda sobre el
+        // calculado con Yahoo — para cuando ese cálculo automático da null
+        // (símbolo sin serie ahí) pero el usuario sabe el resultado real.
+        const changePctSource: 'manual' | 'computed' | null =
+          s.reported_result_pct != null ? 'manual' : outcome?.changePct != null ? 'computed' : null
         return {
           id: s.id,
           date: s.posted_at.slice(0, 10),
@@ -196,7 +208,9 @@ async function handleGet(req: VercelRequest, res: VercelResponse, userId: string
           companyName,
           possibleGainPct: s.possible_gain_pct,
           stopLossPct: s.possible_loss_pct,
-          changePct: outcome?.changePct ?? null,
+          changePct: s.reported_result_pct ?? outcome?.changePct ?? null,
+          changePctSource,
+          manualResultPct: s.reported_result_pct,
           sellDate,
           sellDateSource,
           manualSellDate: s.manual_sell_date,

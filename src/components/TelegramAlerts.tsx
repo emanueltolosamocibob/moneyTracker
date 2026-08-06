@@ -28,6 +28,13 @@ interface BuyAlert {
   possibleGainPct: number | null
   stopLossPct: number | null
   changePct: number | null
+  // 'manual' cuando changePct viene de un resultado cargado a mano (para
+  // cuando Yahoo no tiene serie del símbolo y el cálculo automático da
+  // null); 'computed' cuando sale de createPriceLookup; null si no hay nada.
+  changePctSource: 'manual' | 'computed' | null
+  // Valor crudo del resultado manual, independiente de si ganó en changePct
+  // — precarga el campo del modal de edición.
+  manualResultPct: number | null
   // Fecha efectiva de cierre (null mientras sigue abierta) — no la fecha
   // "sugerida" que trae la propia alerta de compra.
   sellDate: string | null
@@ -77,6 +84,7 @@ export default function TelegramAlerts() {
   const [editGainPct, setEditGainPct] = useState('')
   const [editStopLossPct, setEditStopLossPct] = useState('')
   const [editSellDate, setEditSellDate] = useState('')
+  const [editResultPct, setEditResultPct] = useState('')
   const [editSaving, setEditSaving] = useState(false)
   const [editError, setEditError] = useState<string | null>(null)
 
@@ -133,6 +141,7 @@ export default function TelegramAlerts() {
     setEditGainPct(alert.possibleGainPct != null ? String(alert.possibleGainPct) : '')
     setEditStopLossPct(alert.stopLossPct != null ? String(alert.stopLossPct) : '')
     setEditSellDate(alert.manualSellDate ?? '')
+    setEditResultPct(alert.manualResultPct != null ? String(alert.manualResultPct) : '')
     setEditError(null)
   }
 
@@ -164,6 +173,7 @@ export default function TelegramAlerts() {
           possibleGainPct: editGainPct === '' ? null : Number(editGainPct),
           stopLossPct: editStopLossPct === '' ? null : Number(editStopLossPct),
           manualSellDate: editSellDate === '' ? null : editSellDate,
+          resultPct: editResultPct === '' ? null : Number(editResultPct),
         }),
       })
       const json = await res.json()
@@ -302,7 +312,13 @@ export default function TelegramAlerts() {
                   <td className="tx-amount tg-stoploss">{alert.stopLossPct != null ? `-${alert.stopLossPct.toFixed(2)}%` : '—'}</td>
                   <td className="tx-amount">
                     {alert.changePct != null ? (
-                      <span className={alert.changePct >= 0 ? 'tg-hit' : 'tg-miss'}>{formatPct(alert.changePct)}</span>
+                      <span
+                        className={alert.changePct >= 0 ? 'tg-hit' : 'tg-miss'}
+                        title={alert.changePctSource === 'manual' ? 'Cargado a mano' : undefined}
+                      >
+                        {formatPct(alert.changePct)}
+                        {alert.changePctSource === 'manual' && '*'}
+                      </span>
                     ) : (
                       <span className="tg-muted" title="No se consiguió serie de precios para este símbolo">
                         —
@@ -378,6 +394,26 @@ export default function TelegramAlerts() {
                 {editSellDate && (
                   <button type="button" className="gmail-scan-btn" onClick={() => setEditSellDate('')}>
                     Quitar fecha de venta
+                  </button>
+                )}
+              </>
+            )}
+            {(editingAlert.sellDateSource === 'signal' || editSellDate) && (
+              <>
+                <p className="budget-form-hint">
+                  Resultado (%) — cargalo a mano si Yahoo Finance no tiene la serie de este símbolo y "% desde la alerta" quedó
+                  vacío.
+                </p>
+                <input
+                  type="number"
+                  step="0.01"
+                  placeholder="Resultado (%)"
+                  value={editResultPct}
+                  onChange={(e) => setEditResultPct(e.target.value)}
+                />
+                {editResultPct && (
+                  <button type="button" className="gmail-scan-btn" onClick={() => setEditResultPct('')}>
+                    Quitar resultado manual
                   </button>
                 )}
               </>
