@@ -3,10 +3,8 @@
 //
 // El canal usa una plantilla fija y estable — validado a mano sobre el
 // histórico completo (84 alertas de compra, ene-ago 2026): el 100% matchea
-// este formato. Por eso esto es regex puro y no gasta una llamada al LLM
-// (a diferencia de analyze.ts, que sí usa el LLM porque está pensado para un
-// grupo genérico sin plantilla fija). Lo que no matchea es comentario de
-// mercado y `parseSignal` devuelve null.
+// este formato. Por eso esto es regex puro y no gasta una llamada al LLM. Lo
+// que no matchea es comentario de mercado y `parseSignal` devuelve null.
 //
 // Formato real de una alerta de compra:
 //   🟢ALERTA DE COMPRA🟢 Nu Holdings Ltd ($NU) ... 🟢Take Profit: 18,54 USD

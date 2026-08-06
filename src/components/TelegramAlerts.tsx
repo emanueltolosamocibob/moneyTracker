@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { supabase } from '../lib/supabaseClient'
 import { useAuth } from '../lib/AuthContext'
-import type { TelegramAnalysis, TelegramSyncState } from '../types/database'
-import { IconDownload, IconRefresh, IconTrendingUp } from './icons'
+import type { TelegramSyncState } from '../types/database'
+import { IconDownload, IconRefresh } from './icons'
 import Modal from './Modal'
 import DateField from './DateField'
 
@@ -28,11 +28,17 @@ interface BuyAlert {
   possibleGainPct: number | null
   stopLossPct: number | null
   changePct: number | null
-  // Fecha de la alerta de venta que cerró esta compra (null mientras sigue
-  // abierta) — no la fecha "sugerida" que trae la propia alerta de compra.
+  // Fecha efectiva de cierre (null mientras sigue abierta) — no la fecha
+  // "sugerida" que trae la propia alerta de compra.
   sellDate: string | null
-  // 'closed' cuando el canal ya mandó una alerta de venta para este símbolo
-  // después de esta compra; 'open' mientras solo hubo la de compra — ver
+  // 'signal' cuando sellDate viene de una alerta de venta real del canal
+  // (prioridad); 'manual' cuando viene de manualSellDate, cargada a mano
+  // desde el modal de edición; null si sigue abierta.
+  sellDateSource: 'signal' | 'manual' | null
+  // Valor crudo del cierre manual, independiente de cuál gane en sellDate —
+  // es lo que precarga el campo del modal de edición.
+  manualSellDate: string | null
+  // 'closed' cuando hay sellDate (real o manual); 'open' si no — ver
   // api/telegram/buy-alerts.ts.
   status: 'open' | 'closed'
 }
@@ -55,15 +61,12 @@ function formatPct(pct: number) {
 export default function TelegramAlerts() {
   const { user } = useAuth()
   const [syncState, setSyncState] = useState<TelegramSyncState | null>(null)
-  const [analysis, setAnalysis] = useState<TelegramAnalysis | null>(null)
   const [buyAlerts, setBuyAlerts] = useState<BuyAlert[] | null>(null)
   const [days, setDays] = useState(90)
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
-  const [loading, setLoading] = useState(true)
   const [alertsLoading, setAlertsLoading] = useState(true)
   const [syncing, setSyncing] = useState(false)
   const [syncProgress, setSyncProgress] = useState(0)
-  const [analyzing, setAnalyzing] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   // Alerta en edición — se abre con doble click sobre su fila (mismo gesto
@@ -73,6 +76,7 @@ export default function TelegramAlerts() {
   const [editTicker, setEditTicker] = useState('')
   const [editGainPct, setEditGainPct] = useState('')
   const [editStopLossPct, setEditStopLossPct] = useState('')
+  const [editSellDate, setEditSellDate] = useState('')
   const [editSaving, setEditSaving] = useState(false)
   const [editError, setEditError] = useState<string | null>(null)
 
@@ -83,21 +87,13 @@ export default function TelegramAlerts() {
 
   async function load() {
     if (!user) return
-    setLoading(true)
-    const [{ data: state }, { data: analyses }] = await Promise.all([
-      supabase.from('telegram_sync_state').select('*').maybeSingle(),
-      supabase.from('telegram_analyses').select('*').order('created_at', { ascending: false }).limit(1),
-    ])
+    const { data: state } = await supabase.from('telegram_sync_state').select('*').maybeSingle()
     setSyncState((state as TelegramSyncState) ?? null)
-    setAnalysis((analyses?.[0] as TelegramAnalysis) ?? null)
-    setLoading(false)
   }
 
   // Tabla de alertas de compra: se lee directo de trade_signals (ya parseado
-  // por regex al ingerir, ver api/telegram/buy-alerts.ts), no del análisis
-  // del LLM — sin el límite de 300 mensajes que hacía que "1 año" mostrara
-  // siempre lo mismo que "30 días". Se recarga sola al cambiar el período,
-  // sin costo de LLM.
+  // por regex al ingerir, ver api/telegram/buy-alerts.ts) — sin costo de LLM,
+  // se recarga sola al cambiar el período.
   async function loadBuyAlerts() {
     if (!user) return
     setAlertsLoading(true)
@@ -136,6 +132,7 @@ export default function TelegramAlerts() {
     setEditTicker(alert.ticker)
     setEditGainPct(alert.possibleGainPct != null ? String(alert.possibleGainPct) : '')
     setEditStopLossPct(alert.stopLossPct != null ? String(alert.stopLossPct) : '')
+    setEditSellDate(alert.manualSellDate ?? '')
     setEditError(null)
   }
 
@@ -166,6 +163,7 @@ export default function TelegramAlerts() {
           ticker: tickerClean,
           possibleGainPct: editGainPct === '' ? null : Number(editGainPct),
           stopLossPct: editStopLossPct === '' ? null : Number(editStopLossPct),
+          manualSellDate: editSellDate === '' ? null : editSellDate,
         }),
       })
       const json = await res.json()
@@ -217,36 +215,13 @@ export default function TelegramAlerts() {
     }
   }
 
-  async function handleAnalyze() {
-    setAnalyzing(true)
-    setError(null)
-    try {
-      const headers = await authHeader()
-      const res = await fetch('/api/telegram/analyze', {
-        method: 'POST',
-        headers: { ...headers, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ days }),
-      })
-      const json = await res.json()
-      if (!res.ok) throw new Error(json.error ?? 'No se pudo analizar las alertas')
-      setAnalysis(json.analysis as TelegramAnalysis)
-    } catch (err) {
-      setError((err as Error).message)
-    } finally {
-      setAnalyzing(false)
-    }
-  }
-
   return (
     <section className="tg-section">
       <div className="tx-header">
         <h3>Alertas de Telegram</h3>
         <div className="tg-actions">
-          <button type="button" className="gmail-scan-btn" onClick={handleSync} disabled={syncing || analyzing}>
+          <button type="button" className="gmail-scan-btn" onClick={handleSync} disabled={syncing}>
             <IconRefresh /> {syncing ? 'Sincronizando...' : 'Sincronizar'}
-          </button>
-          <button type="button" className="gmail-scan-btn" onClick={handleAnalyze} disabled={syncing || analyzing}>
-            <IconTrendingUp size={16} /> {analyzing ? 'Analizando...' : 'Analizar'}
           </button>
           <button
             type="button"
@@ -260,7 +235,7 @@ export default function TelegramAlerts() {
       </div>
 
       <div className="tg-filters">
-        <div className="type-toggle tg-period" role="group" aria-label="Período a analizar">
+        <div className="type-toggle tg-period" role="group" aria-label="Período">
           {PERIODS.map((p) => (
             <button key={p.days} type="button" className={days === p.days ? 'active' : ''} onClick={() => setDays(p.days)}>
               {p.label}
@@ -287,24 +262,11 @@ export default function TelegramAlerts() {
         <p className="tg-meta">
           {syncState.chat_title ?? syncState.chat_id}
           {syncState.last_synced_at && ` · última sincronización ${formatDate(syncState.last_synced_at)}`}
-          {/* Mientras el backfill no termine, el análisis solo ve el tramo ya
-              traído — vale la pena decirlo antes de que saque conclusiones de
-              medio historial. */}
+          {/* Mientras el backfill no termine, la tabla solo ve el tramo ya
+              traído — vale la pena decirlo antes de que parezca que faltan
+              alertas. */}
           {!syncState.backfill_done && ' · historial incompleto, seguí sincronizando'}
         </p>
-      )}
-
-      {loading ? (
-        <p>Cargando...</p>
-      ) : (
-        analysis && (
-          <div className="tg-summary">
-            <p>{analysis.summary}</p>
-            <p className="tg-meta">
-              {analysis.message_count} mensajes · {formatDate(analysis.from_date)} a {formatDate(analysis.to_date)}
-            </p>
-          </div>
-        )
       )}
 
       {alertsLoading ? (
@@ -377,15 +339,6 @@ export default function TelegramAlerts() {
         </Modal>
       )}
 
-      {analyzing && (
-        <Modal>
-          <div className="modal-panel-sync">
-            <IconTrendingUp size={28} />
-            <p>Analizando alertas...</p>
-          </div>
-        </Modal>
-      )}
-
       {editingAlert && (
         <Modal>
           <h3>Editar alerta — {editingAlert.ticker}</h3>
@@ -411,6 +364,24 @@ export default function TelegramAlerts() {
               value={editStopLossPct}
               onChange={(e) => setEditStopLossPct(e.target.value)}
             />
+            {editingAlert.sellDateSource === 'signal' ? (
+              <p className="budget-form-hint">
+                Cerrada por una alerta de venta real del canal ({editingAlert.sellDate && formatDate(editingAlert.sellDate)}) — no
+                editable acá.
+              </p>
+            ) : (
+              <>
+                <p className="budget-form-hint">
+                  Fecha de venta (manual) — marcá la alerta como cerrada si vendiste sin que el canal mandara su propia alerta.
+                </p>
+                <DateField value={editSellDate} onChange={setEditSellDate} />
+                {editSellDate && (
+                  <button type="button" className="gmail-scan-btn" onClick={() => setEditSellDate('')}>
+                    Quitar fecha de venta
+                  </button>
+                )}
+              </>
+            )}
             {editError && <p className="error">{editError}</p>}
             <div className="modal-actions">
               <button type="button" onClick={() => setEditingAlert(null)}>

@@ -17,8 +17,8 @@ export interface DailyClose {
 // (api/_lib/paperTrading.ts) para saber si un stop loss o un take profit se
 // tocó en algún momento del día, no solo si el cierre quedó de un lado o del
 // otro. `resolveSeries`/`createPriceLookup` más abajo siguen trabajando solo
-// con el cierre porque a la evaluación retrospectiva de analyze.ts no le hace
-// falta más.
+// con el cierre porque a la tabla de alertas de compra (api/telegram/buy-
+// alerts.ts) no le hace falta más.
 export interface DailyBar extends DailyClose {
   open: number
   high: number
@@ -115,6 +115,11 @@ export function createPriceLookup(fromMs: number) {
     symbol: string,
     signalDate: string,
     action: 'buy' | 'sell' | 'hold',
+    // Fecha hasta la que evaluar, en vez de hasta hoy — para una alerta ya
+    // cerrada (el canal mandó la de venta) tiene más sentido medir el
+    // rendimiento real de la operación, entrada a salida, que "cuánto se
+    // movió el papel desde entonces hasta hoy" (ver buy-alerts.ts).
+    asOfDate?: string,
   ): Promise<SignalOutcome | null> {
     // Una señal de "mantener" no tiene precio de entrada que evaluar.
     if (action === 'hold') return null
@@ -131,7 +136,10 @@ export function createPriceLookup(fromMs: number) {
     // después del cierre, el precio al que realmente se podía entrar es el de
     // la rueda siguiente, no el último anterior.
     const entry = series.find((point) => point.date >= signalDate)
-    const last = series[series.length - 1]
+    // Mismo criterio que entry pero para el otro extremo: primera rueda en o
+    // después de asOfDate. Si no hay ninguna todavía (ej. la venta es de hoy
+    // y el mercado no cerró), cae al último punto disponible de la serie.
+    const last = asOfDate ? (series.find((point) => point.date >= asOfDate) ?? series[series.length - 1]) : series[series.length - 1]
     if (!entry || !last || entry.date === last.date) return null
 
     const changePct = ((last.close - entry.close) / entry.close) * 100

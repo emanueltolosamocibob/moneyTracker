@@ -2291,22 +2291,6 @@ input[type='number'] {
   font-size: 0.85rem;
 }
 
-.tg-summary {
-  padding: 1rem;
-  border-radius: var(--radius);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  background: rgba(255, 255, 255, 0.08);
-  margin-bottom: 1.25rem;
-}
-
-.tg-summary p {
-  margin: 0;
-}
-
-.tg-summary .tg-meta {
-  margin-top: 0.6rem;
-}
-
 /* Compra y venta comparten la escala verde/rojo de ingresos y egresos: en una
    app de plata ese par ya significa algo, y darle otro color acá sería pedirle
    al usuario que aprenda una segunda convención. */
