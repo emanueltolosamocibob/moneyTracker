@@ -221,6 +221,10 @@ export interface TradeSignal {
   // de venta real del canal para el mismo símbolo tiene prioridad sobre esto
   // al mostrar "Fecha de venta".
   manual_sell_date: string | null // 'YYYY-MM-DD'
+  // true para una alerta de compra cargada a mano desde la tabla de
+  // "Alertas de Telegram" (ver api/telegram/buy-alerts.ts POST), sin
+  // mensaje real de Telegram detrás.
+  is_manual: boolean
   created_at: string
 }
 

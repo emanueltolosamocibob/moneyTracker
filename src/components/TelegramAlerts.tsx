@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { supabase } from '../lib/supabaseClient'
 import { useAuth } from '../lib/AuthContext'
 import type { TelegramSyncState } from '../types/database'
-import { IconDownload, IconRefresh } from './icons'
+import { IconDownload, IconPlus, IconRefresh } from './icons'
 import Modal from './Modal'
 import DateField from './DateField'
 
@@ -48,6 +48,9 @@ interface BuyAlert {
   // 'closed' cuando hay sellDate (real o manual); 'open' si no — ver
   // api/telegram/buy-alerts.ts.
   status: 'open' | 'closed'
+  // true si se cargó a mano (botón "+ Agregar alerta"), sin mensaje real de
+  // Telegram detrás.
+  isManual: boolean
 }
 
 // Tope de vueltas del loop de sincronización. El backfill de un grupo con años
@@ -87,6 +90,25 @@ export default function TelegramAlerts() {
   const [editResultPct, setEditResultPct] = useState('')
   const [editSaving, setEditSaving] = useState(false)
   const [editError, setEditError] = useState<string | null>(null)
+
+  // Confirmación de borrado — se abre desde "Eliminar alerta" en el modal de
+  // edición, no directo, porque borrar una alerta borra en cascada sus
+  // posiciones de paper trading si generó alguna (ver handleDelete en
+  // api/telegram/buy-alerts.ts), a diferencia de otros borrados manuales de
+  // la app que no avisan (ver CLAUDE.md).
+  const [pendingDeleteAlert, setPendingDeleteAlert] = useState<BuyAlert | null>(null)
+  const [deletingAlert, setDeletingAlert] = useState(false)
+  const [deleteError, setDeleteError] = useState<string | null>(null)
+
+  // Alta manual — botón "+ Agregar alerta".
+  const [addOpen, setAddOpen] = useState(false)
+  const [addDate, setAddDate] = useState('')
+  const [addTicker, setAddTicker] = useState('')
+  const [addCompany, setAddCompany] = useState('')
+  const [addGainPct, setAddGainPct] = useState('')
+  const [addStopLossPct, setAddStopLossPct] = useState('')
+  const [addSaving, setAddSaving] = useState(false)
+  const [addError, setAddError] = useState<string | null>(null)
 
   async function authHeader() {
     const { data } = await supabase.auth.getSession()
@@ -187,6 +209,83 @@ export default function TelegramAlerts() {
     }
   }
 
+  function handleDeleteAlertClick() {
+    if (!editingAlert) return
+    setPendingDeleteAlert(editingAlert)
+    setEditingAlert(null)
+    setDeleteError(null)
+  }
+
+  async function handleConfirmDeleteAlert() {
+    if (!pendingDeleteAlert) return
+    setDeletingAlert(true)
+    setDeleteError(null)
+    try {
+      const headers = await authHeader()
+      const res = await fetch(`/api/telegram/buy-alerts?id=${encodeURIComponent(pendingDeleteAlert.id)}`, {
+        method: 'DELETE',
+        headers,
+      })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error ?? 'No se pudo eliminar la alerta.')
+      setPendingDeleteAlert(null)
+      await loadBuyAlerts()
+    } catch (err) {
+      setDeleteError((err as Error).message)
+    } finally {
+      setDeletingAlert(false)
+    }
+  }
+
+  function openAddAlert() {
+    setAddDate('')
+    setAddTicker('')
+    setAddCompany('')
+    setAddGainPct('')
+    setAddStopLossPct('')
+    setAddError(null)
+    setAddOpen(true)
+  }
+
+  async function handleAddAlertSubmit(e: FormEvent) {
+    e.preventDefault()
+    setAddError(null)
+
+    const tickerClean = addTicker.trim().toUpperCase()
+    if (!addDate) {
+      setAddError('Ingresá una fecha.')
+      return
+    }
+    if (!tickerClean) {
+      setAddError('El símbolo no puede estar vacío.')
+      return
+    }
+
+    setAddSaving(true)
+    try {
+      const headers = await authHeader()
+      const res = await fetch('/api/telegram/buy-alerts', {
+        method: 'POST',
+        headers: { ...headers, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          date: addDate,
+          ticker: tickerClean,
+          companyName: addCompany.trim() || null,
+          possibleGainPct: addGainPct === '' ? null : Number(addGainPct),
+          stopLossPct: addStopLossPct === '' ? null : Number(addStopLossPct),
+        }),
+      })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error ?? 'No se pudo agregar la alerta.')
+      setAddOpen(false)
+      await loadBuyAlerts()
+    } catch (err) {
+      setAddError((err as Error).message)
+    } finally {
+      setAddSaving(false)
+    }
+  }
+
   // "Exportar PDF" vía el diálogo de impresión del navegador (Guardar como
   // PDF) en vez de sumar una librería como jspdf solo para esto — .tg-print
   // (ver index.css) oculta todo lo demás de la página en @media print y deja
@@ -232,6 +331,9 @@ export default function TelegramAlerts() {
         <div className="tg-actions">
           <button type="button" className="gmail-scan-btn" onClick={handleSync} disabled={syncing}>
             <IconRefresh /> {syncing ? 'Sincronizando...' : 'Sincronizar'}
+          </button>
+          <button type="button" className="gmail-scan-btn" onClick={openAddAlert}>
+            <IconPlus size={14} /> Agregar alerta
           </button>
           <button
             type="button"
@@ -306,7 +408,10 @@ export default function TelegramAlerts() {
               {filteredAlerts.map((alert) => (
                 <tr key={alert.id} onDoubleClick={() => openEditAlert(alert)}>
                   <td>{formatDate(alert.date)}</td>
-                  <td className="tx-amount">{alert.ticker}</td>
+                  <td className="tx-amount">
+                    {alert.ticker}
+                    {alert.isManual && <span className="tg-badge">Manual</span>}
+                  </td>
                   <td className="tg-company">{alert.companyName ?? <span className="tg-muted">—</span>}</td>
                   <td className="tx-amount">{alert.possibleGainPct != null ? `+${alert.possibleGainPct.toFixed(2)}%` : '—'}</td>
                   <td className="tx-amount tg-stoploss">{alert.stopLossPct != null ? `-${alert.stopLossPct.toFixed(2)}%` : '—'}</td>
@@ -420,11 +525,73 @@ export default function TelegramAlerts() {
             )}
             {editError && <p className="error">{editError}</p>}
             <div className="modal-actions">
+              <button type="button" className="danger modal-actions-start" onClick={handleDeleteAlertClick}>
+                Eliminar alerta
+              </button>
               <button type="button" onClick={() => setEditingAlert(null)}>
                 Cancelar
               </button>
               <button type="submit" className="primary" disabled={editSaving}>
                 {editSaving ? 'Guardando...' : 'Guardar cambios'}
+              </button>
+            </div>
+          </form>
+        </Modal>
+      )}
+
+      {pendingDeleteAlert && (
+        <Modal>
+          <h3>Eliminar alerta</h3>
+          <p>
+            Se va a eliminar la alerta de compra de &quot;{pendingDeleteAlert.ticker}&quot; del {formatDate(pendingDeleteAlert.date)}.
+            Si generó posiciones de paper trading, esas posiciones y sus evaluaciones también se eliminan. Esta acción no se puede
+            deshacer.
+          </p>
+          {deleteError && <p className="error">{deleteError}</p>}
+          <div className="modal-actions">
+            <button type="button" onClick={() => setPendingDeleteAlert(null)}>
+              Cancelar
+            </button>
+            <button type="button" className="danger" disabled={deletingAlert} onClick={handleConfirmDeleteAlert}>
+              {deletingAlert ? 'Eliminando...' : 'Eliminar'}
+            </button>
+          </div>
+        </Modal>
+      )}
+
+      {addOpen && (
+        <Modal>
+          <h3>Agregar alerta</h3>
+          <form className="budget-form" onSubmit={handleAddAlertSubmit} noValidate>
+            <DateField value={addDate} onChange={setAddDate} />
+            <input
+              type="text"
+              placeholder="Símbolo"
+              value={addTicker}
+              onChange={(e) => setAddTicker(e.target.value.toUpperCase())}
+            />
+            <input type="text" placeholder="Compañía (opcional)" value={addCompany} onChange={(e) => setAddCompany(e.target.value)} />
+            <input
+              type="number"
+              step="0.01"
+              placeholder="Ganancia estimada (%)"
+              value={addGainPct}
+              onChange={(e) => setAddGainPct(e.target.value)}
+            />
+            <input
+              type="number"
+              step="0.01"
+              placeholder="Stop loss (%)"
+              value={addStopLossPct}
+              onChange={(e) => setAddStopLossPct(e.target.value)}
+            />
+            {addError && <p className="error">{addError}</p>}
+            <div className="modal-actions">
+              <button type="button" onClick={() => setAddOpen(false)}>
+                Cancelar
+              </button>
+              <button type="submit" className="primary" disabled={addSaving}>
+                {addSaving ? 'Guardando...' : 'Agregar'}
               </button>
             </div>
           </form>

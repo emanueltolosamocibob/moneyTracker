@@ -32,8 +32,87 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     await handlePatch(req, res, userId, chatId)
     return
   }
+  if (req.method === 'POST') {
+    await handlePost(req, res, userId, chatId)
+    return
+  }
+  if (req.method === 'DELETE') {
+    await handleDelete(req, res, userId, chatId)
+    return
+  }
 
   await handleGet(req, res, userId, chatId)
+}
+
+// Alerta de compra cargada a mano (botón "+ Agregar alerta"), sin mensaje
+// real de Telegram detrás — ver 0019_trade_signal_manual_flag.sql. message_id
+// negativo porque los ids reales de Telegram siempre son positivos (evita
+// pisar uno real) y raw_text se arma en el mismo formato que ya sabe leer
+// extractDisplayFields, para no tener que duplicar esa lógica acá.
+async function handlePost(req: VercelRequest, res: VercelResponse, userId: string, chatId: string) {
+  const { date, ticker, companyName, possibleGainPct, stopLossPct } = req.body ?? {}
+  if (!date || typeof date !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+    res.status(400).json({ error: 'Fecha inválida.' })
+    return
+  }
+  const tickerClean = typeof ticker === 'string' ? ticker.trim().toUpperCase() : ''
+  if (!tickerClean) {
+    res.status(400).json({ error: 'El símbolo no puede estar vacío.' })
+    return
+  }
+  const companyClean = typeof companyName === 'string' ? companyName.trim() : ''
+
+  const admin = supabaseAdmin()
+  const rawText = `🟢ALERTA DE COMPRA🟢 ${companyClean || tickerClean} ($${tickerClean}) [Cargada manualmente]`
+
+  const { error: insertError } = await admin.from('trade_signals').insert({
+    user_id: userId,
+    chat_id: chatId,
+    message_id: -Date.now(),
+    posted_at: `${date}T12:00:00.000Z`,
+    kind: 'buy',
+    ticker: tickerClean,
+    possible_gain_pct: possibleGainPct === '' || possibleGainPct == null ? null : Number(possibleGainPct),
+    possible_loss_pct: stopLossPct === '' || stopLossPct == null ? null : Number(stopLossPct),
+    raw_text: rawText,
+    is_manual: true,
+  })
+
+  if (insertError) {
+    res.status(500).json({ error: insertError.message })
+    return
+  }
+
+  res.status(200).json({ ok: true })
+}
+
+// Solo borra lo que ya es de este usuario y sigue siendo una alerta de
+// compra. paper_positions.signal_id referencia esta tabla con on delete
+// cascade (ver 0016_paper_trading.sql) — si esta alerta abrió posiciones de
+// paper trading, se borran junto con sus evaluaciones (paper_decisions,
+// cascada desde paper_positions). El frontend avisa de esto antes de llamar.
+async function handleDelete(req: VercelRequest, res: VercelResponse, userId: string, chatId: string) {
+  const id = typeof req.query.id === 'string' ? req.query.id : null
+  if (!id) {
+    res.status(400).json({ error: 'Falta el id de la alerta.' })
+    return
+  }
+
+  const admin = supabaseAdmin()
+  const { error: deleteError } = await admin
+    .from('trade_signals')
+    .delete()
+    .eq('id', id)
+    .eq('user_id', userId)
+    .eq('chat_id', chatId)
+    .eq('kind', 'buy')
+
+  if (deleteError) {
+    res.status(500).json({ error: deleteError.message })
+    return
+  }
+
+  res.status(200).json({ ok: true })
 }
 
 async function handlePatch(req: VercelRequest, res: VercelResponse, userId: string, chatId: string) {
@@ -121,7 +200,7 @@ async function handleGet(req: VercelRequest, res: VercelResponse, userId: string
   const admin = supabaseAdmin()
   const { data: signals, error } = await admin
     .from('trade_signals')
-    .select('id, posted_at, ticker, possible_gain_pct, possible_loss_pct, raw_text, manual_sell_date, reported_result_pct')
+    .select('id, posted_at, ticker, possible_gain_pct, possible_loss_pct, raw_text, manual_sell_date, reported_result_pct, is_manual')
     .eq('user_id', userId)
     .eq('chat_id', chatId)
     .eq('kind', 'buy')
@@ -215,6 +294,7 @@ async function handleGet(req: VercelRequest, res: VercelResponse, userId: string
           sellDateSource,
           manualSellDate: s.manual_sell_date,
           status: sellDate ? 'closed' : 'open',
+          isManual: s.is_manual,
         }
       }),
   )
