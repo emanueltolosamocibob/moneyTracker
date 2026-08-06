@@ -216,6 +216,11 @@ export interface TradeSignal {
   risk_benefit: number | null
   reported_result_pct: number | null
   raw_text: string
+  // Cierre manual desde el modal de edición de "Alertas de Telegram" (ver
+  // api/telegram/buy-alerts.ts), solo relevante en kind='buy' — una alerta
+  // de venta real del canal para el mismo símbolo tiene prioridad sobre esto
+  // al mostrar "Fecha de venta".
+  manual_sell_date: string | null // 'YYYY-MM-DD'
   created_at: string
 }
 

@@ -7,16 +7,9 @@ const DEFAULT_DAYS = 90
 const MAX_DAYS = 365
 
 // Tabla de "Alertas de Telegram" en Inversiones: una fila por alerta de
-// compra, con los datos tal como los declaró el canal.
-//
-// A diferencia de api/telegram/analyze.ts (que manda hasta MAX_MESSAGES=300
-// mensajes de chat crudo a un LLM), esto lee directo de `trade_signals` —
-// ya parseado por regex en la ingesta del portfolio simulado (ver
-// api/_lib/parseSignal.ts), sin límite de mensajes ni costo de LLM. Corrige
-// un bug real: con 300 mensajes de tope y ~13 mensajes/día de charla en el
-// canal, elegir "1 año" en el selector de período no cambiaba nada — esos
-// 300 mensajes más recientes son ~3 semanas, así que siempre se veía "este
-// mes" sin importar la ventana pedida.
+// compra, con los datos tal como los declaró el canal. Lee directo de
+// `trade_signals` — ya parseado por regex en la ingesta del portfolio
+// simulado (ver api/_lib/parseSignal.ts) — sin costo de LLM.
 //
 // PATCH acá mismo en vez de un archivo nuevo (api/telegram/edit-alert.ts):
 // el plan Hobby de Vercel tope a 12 funciones y ya está al límite (ver
@@ -44,7 +37,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 }
 
 async function handlePatch(req: VercelRequest, res: VercelResponse, userId: string, chatId: string) {
-  const { id, date, ticker, possibleGainPct, stopLossPct } = req.body ?? {}
+  const { id, date, ticker, possibleGainPct, stopLossPct, manualSellDate } = req.body ?? {}
   if (!id || typeof id !== 'string') {
     res.status(400).json({ error: 'Falta el id de la alerta.' })
     return
@@ -56,6 +49,14 @@ async function handlePatch(req: VercelRequest, res: VercelResponse, userId: stri
   const tickerClean = typeof ticker === 'string' ? ticker.trim().toUpperCase() : ''
   if (!tickerClean) {
     res.status(400).json({ error: 'El símbolo no puede estar vacío.' })
+    return
+  }
+  // '' o null borra el cierre manual (vuelve a Abierta, salvo que exista una
+  // alerta de venta real — ver handleGet). No se valida contra esa alerta
+  // real acá: guardar una fecha manual cuando ya hay una de verdad no rompe
+  // nada, simplemente queda sin usarse porque la real tiene prioridad.
+  if (manualSellDate != null && manualSellDate !== '' && !/^\d{4}-\d{2}-\d{2}$/.test(manualSellDate)) {
+    res.status(400).json({ error: 'Fecha de venta inválida.' })
     return
   }
 
@@ -92,6 +93,7 @@ async function handlePatch(req: VercelRequest, res: VercelResponse, userId: stri
       ticker: tickerClean,
       possible_gain_pct: possibleGainPct === '' || possibleGainPct == null ? null : Number(possibleGainPct),
       possible_loss_pct: stopLossPct === '' || stopLossPct == null ? null : Number(stopLossPct),
+      manual_sell_date: manualSellDate === '' || manualSellDate == null ? null : manualSellDate,
     })
     .eq('id', id)
     .eq('user_id', userId)
@@ -112,7 +114,7 @@ async function handleGet(req: VercelRequest, res: VercelResponse, userId: string
   const admin = supabaseAdmin()
   const { data: signals, error } = await admin
     .from('trade_signals')
-    .select('id, posted_at, ticker, possible_gain_pct, possible_loss_pct, raw_text')
+    .select('id, posted_at, ticker, possible_gain_pct, possible_loss_pct, raw_text, manual_sell_date')
     .eq('user_id', userId)
     .eq('chat_id', chatId)
     .eq('kind', 'buy')
@@ -168,8 +170,8 @@ async function handleGet(req: VercelRequest, res: VercelResponse, userId: string
   }
 
   // El precio de entrada se toma a la fecha de la alerta (primera rueda en o
-  // después), igual que en analyze.ts — cachea por símbolo, así que un
-  // ticker que se repite en varias alertas no vuelve a pedir la serie.
+  // después) — cachea por símbolo, así que un ticker que se repite en varias
+  // alertas no vuelve a pedir la serie.
   const evaluate = createPriceLookup(fromMs)
 
   const alerts = await Promise.all(
@@ -177,8 +179,16 @@ async function handleGet(req: VercelRequest, res: VercelResponse, userId: string
       .filter((s) => s.ticker)
       .map(async (s) => {
         const { companyName } = extractDisplayFields(s.raw_text)
-        const outcome = await evaluate(s.ticker!, s.posted_at.slice(0, 10), 'buy')
-        const sellDateIso = closedBuyToSellDate.get(`${s.ticker}|${s.posted_at}`) ?? null
+        // Una alerta de venta real del canal manda sobre el cierre manual
+        // (ver 0018_trade_signal_manual_sell_date.sql) — si en algún momento
+        // llega la de verdad, la manual queda de respaldo sin usarse.
+        const autoSellDate = closedBuyToSellDate.get(`${s.ticker}|${s.posted_at}`)?.slice(0, 10) ?? null
+        const sellDate = autoSellDate ?? s.manual_sell_date ?? null
+        const sellDateSource: 'signal' | 'manual' | null = autoSellDate ? 'signal' : sellDate ? 'manual' : null
+        // Cerrada: "% desde la alerta" mide la operación real, entrada a
+        // venta, no hasta hoy. Abierta: sigue siendo hasta hoy (asOfDate
+        // undefined), que es el comportamiento que ya tenía.
+        const outcome = await evaluate(s.ticker!, s.posted_at.slice(0, 10), 'buy', sellDate ?? undefined)
         return {
           id: s.id,
           date: s.posted_at.slice(0, 10),
@@ -187,8 +197,10 @@ async function handleGet(req: VercelRequest, res: VercelResponse, userId: string
           possibleGainPct: s.possible_gain_pct,
           stopLossPct: s.possible_loss_pct,
           changePct: outcome?.changePct ?? null,
-          sellDate: sellDateIso ? sellDateIso.slice(0, 10) : null,
-          status: sellDateIso ? 'closed' : 'open',
+          sellDate,
+          sellDateSource,
+          manualSellDate: s.manual_sell_date,
+          status: sellDate ? 'closed' : 'open',
         }
       }),
   )
