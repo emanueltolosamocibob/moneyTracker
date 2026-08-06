@@ -499,6 +499,15 @@ export function IconBank({ size = 18 }: IconProps) {
   )
 }
 
+export function IconDownload({ size = 18 }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" {...base}>
+      <path d="M12 3v12M7 10l5 5 5-5" />
+      <path d="M4 19h16" />
+    </svg>
+  )
+}
+
 export function IconGoogle({ size = 18 }: IconProps) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24">
