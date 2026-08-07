@@ -448,7 +448,15 @@ export default function TelegramAlerts() {
                 <tr key={alert.id} onDoubleClick={() => openEditAlert(alert)}>
                   <td>{formatDate(alert.date)}</td>
                   <td className="tx-amount">
-                    {alert.ticker}
+                    <a
+                      href={`https://www.tradingview.com/symbols/${encodeURIComponent(alert.ticker)}/`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="tg-ticker-link"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      {alert.ticker}
+                    </a>
                     {alert.isManual && <span className="tg-badge">Manual</span>}
                   </td>
                   <td className="tg-company">{alert.companyName ?? <span className="tg-muted">—</span>}</td>
