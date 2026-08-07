@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type FormEvent } from 'react'
+import { useEffect, useMemo, useState, type FormEvent, type MouseEvent } from 'react'
 import { supabase } from '../lib/supabaseClient'
 import { useAuth } from '../lib/AuthContext'
 import type { TelegramSyncState } from '../types/database'
@@ -69,6 +69,28 @@ function formatPct(pct: number) {
   return `${pct > 0 ? '+' : ''}${pct.toFixed(1)}%`
 }
 
+function tradingViewUrl(ticker: string) {
+  return `https://www.tradingview.com/symbols/${encodeURIComponent(ticker)}/`
+}
+
+function tradingViewCedearUrl(ticker: string) {
+  return `https://www.tradingview.com/symbols/BCBA-${encodeURIComponent(ticker)}/`
+}
+
+// Un click abre las dos pestañas: el papel original y su CEDEAR en BCBA (el
+// mismo ticker suele cotizar en las dos plazas, ver CLAUDE.md sobre GGAL/
+// YPF/PAM). El href sigue apuntando al papel original — así clicks que no
+// disparan onClick (ctrl/cmd+click, click del medio, "abrir en pestaña
+// nueva" del menú contextual) siguen abriendo esa sola pestaña en vez de
+// quedar rotos.
+function openTickerTabs(e: MouseEvent<HTMLAnchorElement>, ticker: string) {
+  if (e.button === 1 || e.metaKey || e.ctrlKey || e.shiftKey) return
+  e.preventDefault()
+  e.stopPropagation()
+  window.open(tradingViewUrl(ticker), '_blank', 'noopener,noreferrer')
+  window.open(tradingViewCedearUrl(ticker), '_blank', 'noopener,noreferrer')
+}
+
 // Mismo parseo local que formatDate (no new Date(dateStr) directo, que
 // interpreta la fecha en UTC y puede dar un día de diferencia según el huso
 // horario del navegador).
@@ -85,10 +107,10 @@ export default function TelegramAlerts() {
   const [syncState, setSyncState] = useState<TelegramSyncState | null>(null)
   const [buyAlerts, setBuyAlerts] = useState<BuyAlert[] | null>(null)
   const [periodMode, setPeriodMode] = useState<PeriodMode>('preset')
-  const [days, setDays] = useState(90)
+  const [days, setDays] = useState(30)
   const [customFrom, setCustomFrom] = useState('')
   const [customTo, setCustomTo] = useState('')
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('open')
   const [alertsLoading, setAlertsLoading] = useState(true)
   const [syncing, setSyncing] = useState(false)
   const [syncProgress, setSyncProgress] = useState(0)
@@ -449,11 +471,12 @@ export default function TelegramAlerts() {
                   <td>{formatDate(alert.date)}</td>
                   <td className="tx-amount">
                     <a
-                      href={`https://www.tradingview.com/symbols/${encodeURIComponent(alert.ticker)}/`}
+                      href={tradingViewUrl(alert.ticker)}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="tg-ticker-link"
-                      onClick={(e) => e.stopPropagation()}
+                      title="Abre el papel y su CEDEAR en TradingView"
+                      onClick={(e) => openTickerTabs(e, alert.ticker)}
                     >
                       {alert.ticker}
                     </a>
