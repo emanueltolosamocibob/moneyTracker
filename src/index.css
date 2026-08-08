@@ -1060,10 +1060,73 @@ input[type='number'] {
 
 /* Nombre de la compañía junto al símbolo en Cartera actual — atenuado y
    más chico para no competir visualmente con el ticker. */
-.investments-holding-name {
-  margin-left: 0.5rem;
+.holding-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.holding-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.5rem;
+  padding: 1.25rem;
+  border-radius: var(--radius);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.06);
+  cursor: pointer;
+}
+
+.holding-card-top {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem;
+  width: 100%;
+}
+
+/* El dato que más importa de un vistazo — mono para que varios tickers
+   alineados en la grilla lean como una fila de datos, no de texto suelto. */
+.holding-symbol {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 2rem;
+  line-height: 1;
+}
+
+.holding-currency-tag {
+  padding: 0.15rem 0.5rem;
+  border-radius: var(--radius);
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  color: rgba(255, 255, 255, 0.75);
+  font-size: 0.75rem;
+}
+
+.holding-name {
+  margin: -0.3rem 0 0;
   color: rgba(255, 255, 255, 0.55);
-  font-size: 0.85em;
+  font-size: 0.85rem;
+}
+
+.holding-amounts {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  color: rgba(255, 255, 255, 0.75);
+  font-size: 0.9rem;
+}
+
+.holding-amounts strong {
+  font-family: var(--font-mono);
+  color: white;
+}
+
+.holding-card .gmail-scan-btn {
+  align-self: flex-start;
+  margin-top: 0.2rem;
 }
 
 .tx-pagination {
