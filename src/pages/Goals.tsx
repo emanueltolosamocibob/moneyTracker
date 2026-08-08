@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { supabase } from '../lib/supabaseClient'
 import { useAuth } from '../lib/AuthContext'
 import type { Goal, GoalContribution } from '../types/database'
-import { IconChevronDown, IconPencil, IconPlus, IconStar } from '../components/icons'
+import { IconChevronDown, IconPlus, IconStar } from '../components/icons'
 import Modal from '../components/Modal'
 import DateField from '../components/DateField'
 
@@ -77,7 +77,6 @@ export default function Goals() {
   const [editTitle, setEditTitle] = useState('')
   const [editTargetAmountDigits, setEditTargetAmountDigits] = useState('')
   const [editTargetDate, setEditTargetDate] = useState('')
-  const [editIsActive, setEditIsActive] = useState(false)
   const [editSaving, setEditSaving] = useState(false)
   const [editError, setEditError] = useState<string | null>(null)
 
@@ -199,8 +198,8 @@ export default function Goals() {
     load()
   }
 
-  // Marca `goal` como el único objetivo activo, desmarcando el anterior si
-  // había uno — dos updates secuenciales en vez de uno solo porque el
+  // Marca `goal` como el único objetivo principal, desmarcando el anterior
+  // si había uno — dos updates secuenciales en vez de uno solo porque el
   // índice único parcial (goals_one_active_per_user, ver migración 0021)
   // no permite dos filas is_active=true al mismo tiempo aunque sea por un
   // instante dentro de la misma transacción implícita del cliente.
@@ -213,6 +212,22 @@ export default function Goals() {
       return
     }
     load()
+  }
+
+  // Botón estrella arriba a la derecha de la tarjeta: si ya es el principal
+  // lo desmarca directo (sin necesidad de elegir otro), si no lo pasa a
+  // principal desplazando al anterior.
+  async function toggleActiveGoal(goal: Goal) {
+    if (goal.is_active) {
+      const { error: updateError } = await supabase.from('goals').update({ is_active: false }).eq('id', goal.id)
+      if (updateError) {
+        setError(updateError.message)
+        return
+      }
+      load()
+      return
+    }
+    await setActiveGoal(goal)
   }
 
   function openContribute(goal: Goal) {
@@ -260,7 +275,6 @@ export default function Goals() {
     setEditTitle(goal.title)
     setEditTargetAmountDigits(numberToCentsDigits(goal.target_amount))
     setEditTargetDate(goal.target_date)
-    setEditIsActive(goal.is_active)
     setEditError(null)
   }
 
@@ -285,21 +299,12 @@ export default function Goals() {
     }
 
     setEditSaving(true)
-
-    // Igual que setActiveGoal: si se está activando este objetivo, primero
-    // hay que desmarcar el que estuviera activo (si no es este mismo) para
-    // no violar el índice único parcial.
-    if (editIsActive && !editGoal.is_active) {
-      await supabase.from('goals').update({ is_active: false }).eq('user_id', user.id).eq('is_active', true)
-    }
-
     const { error: updateError } = await supabase
       .from('goals')
       .update({
         title: editTitle.trim(),
         target_amount: amountNum,
         target_date: editTargetDate,
-        is_active: editIsActive,
       })
       .eq('id', editGoal.id)
     setEditSaving(false)
@@ -452,24 +457,35 @@ export default function Goals() {
                 key={goal.id}
                 className={`goal-card${completed ? ' completed' : ''}${expanded ? ' expanded' : ''}`}
                 onClick={() => toggleExpand(goal.id)}
+                onDoubleClick={(e) => {
+                  e.stopPropagation()
+                  openEditGoal(goal)
+                }}
                 role="button"
                 tabIndex={0}
                 aria-expanded={expanded}
               >
                 <div className="goal-card-top">
-                  {goal.is_active && !completed && <span className="goal-badge-active">Activo</span>}
-                  {completed && <span className="goal-badge-done">🎉 Cumplido</span>}
-                  <button
-                    type="button"
-                    className="goal-edit-btn"
-                    aria-label={`Editar objetivo ${goal.title}`}
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      openEditGoal(goal)
-                    }}
-                  >
-                    <IconPencil size={14} />
-                  </button>
+                  <span className="goal-card-tags">
+                    {!completed && <span className="goal-tag-date">{formatDateShort(goal.target_date)}</span>}
+                    {goal.is_active && !completed && <span className="goal-badge-active">Principal</span>}
+                    {completed && <span className="goal-badge-done">🎉 Cumplido</span>}
+                  </span>
+                  {!completed && (
+                    <button
+                      type="button"
+                      className={`goal-star-btn${goal.is_active ? ' active' : ''}`}
+                      aria-label={
+                        goal.is_active ? `Desmarcar ${goal.title} como principal` : `Marcar ${goal.title} como principal`
+                      }
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        toggleActiveGoal(goal)
+                      }}
+                    >
+                      <IconStar size={16} />
+                    </button>
+                  )}
                 </div>
 
                 <div className="goal-ring-wrap">
@@ -507,8 +523,8 @@ export default function Goals() {
                       : `Sugerido: ${formatMoney(suggestedMonthly)}/mes para llegar el ${formatDateShort(goal.target_date)}.`}
                 </p>
 
-                <div className="goal-card-actions">
-                  {!completed && (
+                {!completed && (
+                  <div className="goal-card-actions">
                     <button
                       type="button"
                       className="gmail-scan-btn"
@@ -519,20 +535,8 @@ export default function Goals() {
                     >
                       <IconPlus size={14} /> Agregar aporte
                     </button>
-                  )}
-                  {!completed && !goal.is_active && (
-                    <button
-                      type="button"
-                      className="gmail-scan-btn"
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        setActiveGoal(goal)
-                      }}
-                    >
-                      <IconStar size={14} /> Marcar como activo
-                    </button>
-                  )}
-                </div>
+                  </div>
+                )}
 
                 {expanded && (
                   <div className="tx-table-scroll" onClick={(e) => e.stopPropagation()}>
@@ -610,10 +614,6 @@ export default function Goals() {
               onChange={(e) => setEditTargetAmountDigits(e.target.value.replace(/\D/g, '').slice(0, 12))}
             />
             <DateField value={editTargetDate} onChange={setEditTargetDate} />
-            <label className="goal-active-checkbox">
-              <input type="checkbox" checked={editIsActive} onChange={(e) => setEditIsActive(e.target.checked)} />
-              Marcar como objetivo activo
-            </label>
             {editError && <p className="error">{editError}</p>}
             <div className="modal-actions">
               <button type="button" className="danger modal-actions-start" onClick={handleDeleteGoalClick}>

@@ -1535,6 +1535,23 @@ input[type='number'] {
   min-height: 1.5rem;
 }
 
+.goal-card-tags {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.goal-tag-date {
+  padding: 0.15rem 0.5rem;
+  border-radius: var(--radius);
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  color: rgba(255, 255, 255, 0.75);
+  font-size: 0.75rem;
+  font-family: var(--font-mono);
+}
+
 .goal-badge-active {
   padding: 0.15rem 0.5rem;
   border-radius: var(--radius);
@@ -1554,7 +1571,11 @@ input[type='number'] {
   font-weight: 600;
 }
 
-.goal-edit-btn {
+/* Estrella arriba a la derecha para marcar/desmarcar el objetivo principal
+   — misma pastilla translúcida que el resto de los íconos de acción, con un
+   estado "active" (dorado, ícono relleno) para el objetivo ya marcado. */
+.goal-star-btn {
+  flex-shrink: 0;
   margin-left: auto;
   padding: 0.3rem;
   border-radius: var(--radius);
@@ -1564,8 +1585,18 @@ input[type='number'] {
   cursor: pointer;
 }
 
-.goal-edit-btn:hover {
+.goal-star-btn:hover {
   background: rgba(255, 255, 255, 0.16);
+}
+
+.goal-star-btn.active {
+  border-color: rgba(245, 197, 87, 0.5);
+  background: rgba(245, 197, 87, 0.18);
+  color: #f5c557;
+}
+
+.goal-star-btn.active svg {
+  fill: currentColor;
 }
 
 .goal-ring-wrap {
@@ -1663,13 +1694,6 @@ input[type='number'] {
   gap: 0.5rem;
 }
 
-.goal-active-checkbox {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  font-size: 0.9rem;
-  color: rgba(255, 255, 255, 0.85);
-}
 
 .budget-empty {
   display: flex;
