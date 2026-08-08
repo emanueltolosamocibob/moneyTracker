@@ -1081,10 +1081,27 @@ input[type='number'] {
 
 .holding-card-top {
   display: flex;
-  align-items: baseline;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 0.5rem;
   width: 100%;
+}
+
+.holding-symbol-group {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  min-width: 0;
+}
+
+/* El logo ya trae su propio fondo (ver api/investments/logo.ts — son SVGs
+   de TradingView con un rect de fondo sólido), así que solo hace falta
+   redondear las puntas, no agregar un backdrop propio. */
+.holding-logo {
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: var(--radius);
+  flex-shrink: 0;
 }
 
 /* El dato que más importa de un vistazo — mono para que varios tickers

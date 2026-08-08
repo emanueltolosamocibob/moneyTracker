@@ -162,6 +162,33 @@ export default function Investments() {
     return Array.from(groups.values()).sort((a, b) => a.symbol.localeCompare(b.symbol))
   }, [lots])
 
+  // Logo de cada tenencia para las tarjetas de Cartera actual — se busca
+  // aparte (no en `load`) porque depende de `holdings`, no de datos propios
+  // de la tabla; undefined = todavía no se pidió, null = se pidió y no hay
+  // logo (ver api/investments/logo.ts, que puede fallar en silencio).
+  const [logoUrls, setLogoUrls] = useState<Record<string, string | null>>({})
+
+  useEffect(() => {
+    holdings.forEach((h) => {
+      const key = `${h.symbol}__${h.market}`
+      if (key in logoUrls) return
+      ;(async () => {
+        const { data: sessionData } = await supabase.auth.getSession()
+        const token = sessionData.session?.access_token
+        try {
+          const res = await fetch(`/api/investments/logo?symbol=${encodeURIComponent(h.symbol)}`, {
+            headers: token ? { Authorization: `Bearer ${token}` } : {},
+          })
+          const json = res.ok ? await res.json() : { logoUrl: null }
+          setLogoUrls((prev) => ({ ...prev, [key]: json.logoUrl ?? null }))
+        } catch {
+          setLogoUrls((prev) => ({ ...prev, [key]: null }))
+        }
+      })()
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [holdings])
+
   const movements = useMemo<MovementRow[]>(() => {
     const lotById = new Map(lots.map((l) => [l.id, l]))
     const rows: MovementRow[] = []
@@ -539,6 +566,7 @@ export default function Investments() {
         <div className="holding-grid">
           {holdings.map((h) => {
             const currency = MARKET_CURRENCY[h.market]
+            const logoUrl = logoUrls[`${h.symbol}__${h.market}`]
             return (
               <div
                 key={`${h.symbol}__${h.market}`}
@@ -546,7 +574,10 @@ export default function Investments() {
                 onDoubleClick={() => openLotEdit(h.lots[0], h.lots.length - 1)}
               >
                 <div className="holding-card-top">
-                  <span className="holding-symbol">{h.symbol}</span>
+                  <span className="holding-symbol-group">
+                    {logoUrl && <img className="holding-logo" src={logoUrl} alt="" />}
+                    <span className="holding-symbol">{h.symbol}</span>
+                  </span>
                   <span className="holding-currency-tag">{currency}</span>
                 </div>
                 {h.name && <p className="holding-name">{h.name}</p>}
