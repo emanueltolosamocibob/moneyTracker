@@ -533,7 +533,7 @@ export default function Goals() {
                     ? `Cumplido el objetivo antes del ${formatDateShort(goal.target_date)}.`
                     : overdue
                       ? `Venció el ${formatDateShort(goal.target_date)} — faltan ${formatMoney(remaining)}.`
-                      : `Sugerido: ${formatMoney(suggestedMonthly)}/mes para llegar el ${formatDateShort(goal.target_date)}.`}
+                      : `Sugerido: ${formatMoney(suggestedMonthly)}/mes.`}
                 </p>
 
 
