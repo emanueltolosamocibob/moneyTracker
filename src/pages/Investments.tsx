@@ -536,38 +536,44 @@ export default function Investments() {
       ) : holdings.length === 0 ? (
         <p className="empty-state">Todavía no cargaste activos.</p>
       ) : (
-        <div className="tx-table-scroll">
-          <table className="tx-table">
-            <thead>
-              <tr>
-                <th>Símbolo</th>
-                <th>Moneda</th>
-                <th>Cantidad</th>
-                <th className="tx-amount-header">Precio compra</th>
-                <th className="tx-amount-header">Invertido</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody>
-              {holdings.map((h) => (
-                <tr key={`${h.symbol}__${h.market}`} onDoubleClick={() => openLotEdit(h.lots[0], h.lots.length - 1)}>
-                  <td>
-                    {h.symbol}
-                    {h.name && <span className="investments-holding-name">{h.name}</span>}
-                  </td>
-                  <td>{MARKET_CURRENCY[h.market]}</td>
-                  <td>{h.totalQuantity}</td>
-                  <td className="tx-amount">{formatMoney(h.avgBuyPrice, MARKET_CURRENCY[h.market])}</td>
-                  <td className="tx-amount">{formatMoney(h.totalQuantity * h.avgBuyPrice, MARKET_CURRENCY[h.market])}</td>
-                  <td className="tx-actions">
-                    <button type="button" className="gmail-scan-btn" onClick={() => openSell(h)}>
-                      Vender
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        <div className="holding-grid">
+          {holdings.map((h) => {
+            const currency = MARKET_CURRENCY[h.market]
+            return (
+              <div
+                key={`${h.symbol}__${h.market}`}
+                className="holding-card"
+                onDoubleClick={() => openLotEdit(h.lots[0], h.lots.length - 1)}
+              >
+                <div className="holding-card-top">
+                  <span className="holding-symbol">{h.symbol}</span>
+                  <span className="holding-currency-tag">{currency}</span>
+                </div>
+                {h.name && <p className="holding-name">{h.name}</p>}
+                <div className="holding-amounts">
+                  <span>
+                    Cantidad: <strong>{h.totalQuantity}</strong>
+                  </span>
+                  <span>
+                    Precio compra: <strong>{formatMoney(h.avgBuyPrice, currency)}</strong>
+                  </span>
+                  <span>
+                    Invertido: <strong>{formatMoney(h.totalQuantity * h.avgBuyPrice, currency)}</strong>
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  className="gmail-scan-btn"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    openSell(h)
+                  }}
+                >
+                  Vender
+                </button>
+              </div>
+            )
+          })}
         </div>
       )}
 
