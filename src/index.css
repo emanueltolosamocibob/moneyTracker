@@ -1485,7 +1485,7 @@ input[type='number'] {
 
 .goal-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
   gap: 1rem;
   margin-top: 1rem;
 }
@@ -1509,6 +1509,15 @@ input[type='number'] {
 .goal-card.completed {
   border-color: rgba(245, 197, 87, 0.5);
   background: rgba(245, 197, 87, 0.1);
+}
+
+/* Igual que .settings-panel .tx-table: la tabla de aportes solo tiene 2
+   columnas (Fecha, Monto), muy lejos de las 6 de Transacciones que
+   justifican los 640px de min-width de .tx-table — sin este reset, esa
+   tabla angosta forzaba scroll horizontal en una tarjeta que ya de por sí
+   no es tan ancha. */
+.goal-card .tx-table {
+  min-width: 0;
 }
 
 .goal-card-empty {
