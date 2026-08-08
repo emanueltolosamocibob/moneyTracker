@@ -137,6 +137,28 @@ export interface LoanPayment {
   created_at: string
 }
 
+export interface Goal {
+  id: string
+  user_id: string
+  title: string
+  target_amount: number
+  target_date: string // 'YYYY-MM-DD'
+  // Solo un objetivo por usuario puede tener is_active=true (índice único
+  // parcial en la migración 0021) — decide el orden de las tarjetas, no
+  // habilita/bloquea nada funcional.
+  is_active: boolean
+  created_at: string
+}
+
+export interface GoalContribution {
+  id: string
+  user_id: string
+  goal_id: string
+  contribution_date: string // 'YYYY-MM-DD'
+  amount: number
+  created_at: string
+}
+
 export interface GmailConnection {
   user_id: string
   email: string

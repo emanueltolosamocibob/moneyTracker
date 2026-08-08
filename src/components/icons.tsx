@@ -489,6 +489,14 @@ export function IconTv({ size = 18 }: IconProps) {
   )
 }
 
+export function IconStar({ size = 16 }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" {...base}>
+      <path d="M12 2.5l2.9 6.4 6.9.7-5.2 4.8 1.5 6.9-6.1-3.5-6.1 3.5 1.5-6.9-5.2-4.8 6.9-.7Z" />
+    </svg>
+  )
+}
+
 export function IconBank({ size = 18 }: IconProps) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" {...base}>
