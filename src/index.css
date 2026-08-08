@@ -1481,6 +1481,196 @@ input[type='number'] {
   color: rgba(255, 255, 255, 0.75);
 }
 
+/* --- Objetivos --- */
+
+.goal-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.goal-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 1.25rem 1rem;
+  border-radius: var(--radius);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.06);
+  cursor: pointer;
+  text-align: center;
+}
+
+/* Estilo dorado cuando se cumple el objetivo — mismo lenguaje translúcido
+   que el resto de la app (nada de fill sólido), pero con tono cálido en vez
+   del verde de --income para que se note como un estado distinto, festivo. */
+.goal-card.completed {
+  border-color: rgba(245, 197, 87, 0.5);
+  background: rgba(245, 197, 87, 0.1);
+}
+
+.goal-card-empty {
+  justify-content: center;
+  min-height: 220px;
+  color: rgba(255, 255, 255, 0.55);
+  font-family: inherit;
+  font-size: 0.95rem;
+  border-style: dashed;
+  background: transparent;
+}
+
+.goal-card-empty:hover {
+  border-color: rgba(255, 255, 255, 0.3);
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.goal-card-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  width: 100%;
+  min-height: 1.5rem;
+}
+
+.goal-badge-active {
+  padding: 0.15rem 0.5rem;
+  border-radius: var(--radius);
+  background: rgba(74, 222, 128, 0.18);
+  color: var(--income);
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+/* Mismo recipe que .loan-badge-done pero dorado, para la tarjeta cumplida. */
+.goal-badge-done {
+  padding: 0.15rem 0.5rem;
+  border-radius: var(--radius);
+  background: rgba(245, 197, 87, 0.2);
+  color: #f5c557;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.goal-edit-btn {
+  margin-left: auto;
+  padding: 0.3rem;
+  border-radius: var(--radius);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.08);
+  color: white;
+  cursor: pointer;
+}
+
+.goal-edit-btn:hover {
+  background: rgba(255, 255, 255, 0.16);
+}
+
+.goal-ring-wrap {
+  position: relative;
+  width: 140px;
+  height: 140px;
+}
+
+.goal-ring {
+  width: 100%;
+  height: 100%;
+  /* Arranca a las 12, no a las 3 (default de SVG), para que el relleno
+     crezca en sentido horario desde arriba como cualquier progreso circular. */
+  transform: rotate(-90deg);
+}
+
+.goal-ring-track {
+  fill: none;
+  stroke: rgba(255, 255, 255, 0.12);
+  stroke-width: 10;
+}
+
+.goal-ring-fill {
+  fill: none;
+  stroke: var(--income);
+  stroke-width: 10;
+  stroke-linecap: round;
+  transition: stroke-dashoffset 0.3s ease;
+}
+
+.goal-card.completed .goal-ring-fill {
+  stroke: #f5c557;
+}
+
+.goal-ring-content {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.2rem;
+  padding: 0 1.2rem;
+}
+
+.goal-ring-title {
+  font-weight: 700;
+  font-size: 0.9rem;
+  line-height: 1.2;
+  /* Hasta 3 líneas de título antes de truncar con "…" — un objetivo con
+     nombre largo no debería reventar el círculo. */
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.goal-ring-pct {
+  font-family: var(--font-mono);
+  font-size: 1.1rem;
+  color: rgba(255, 255, 255, 0.75);
+}
+
+.goal-card.completed .goal-ring-pct {
+  color: #f5c557;
+}
+
+.goal-amounts {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  color: rgba(255, 255, 255, 0.75);
+  font-size: 0.9rem;
+}
+
+.goal-amounts strong {
+  font-family: var(--font-mono);
+  color: white;
+}
+
+.goal-suggested {
+  margin: 0;
+  font-size: 0.8rem;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.goal-suggested.overdue {
+  color: var(--warning);
+}
+
+.goal-card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.5rem;
+}
+
+.goal-active-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.9rem;
+  color: rgba(255, 255, 255, 0.85);
+}
+
 .budget-empty {
   display: flex;
   flex-direction: column;
