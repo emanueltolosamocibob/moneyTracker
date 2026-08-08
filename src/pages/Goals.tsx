@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { supabase } from '../lib/supabaseClient'
 import { useAuth } from '../lib/AuthContext'
 import type { Goal, GoalContribution } from '../types/database'
-import { IconChevronDown, IconPlus, IconStar } from '../components/icons'
+import { IconChevronDown, IconPlus, IconStar, IconStarOff } from '../components/icons'
 import Modal from '../components/Modal'
 import DateField from '../components/DateField'
 
@@ -472,19 +472,32 @@ export default function Goals() {
                     {completed && <span className="goal-badge-done">🎉 Cumplido</span>}
                   </span>
                   {!completed && (
-                    <button
-                      type="button"
-                      className={`goal-star-btn${goal.is_active ? ' active' : ''}`}
-                      aria-label={
-                        goal.is_active ? `Desmarcar ${goal.title} como principal` : `Marcar ${goal.title} como principal`
-                      }
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        toggleActiveGoal(goal)
-                      }}
-                    >
-                      <IconStar size={16} />
-                    </button>
+                    <span className="goal-card-top-actions">
+                      <button
+                        type="button"
+                        className="goal-icon-btn"
+                        aria-label={
+                          goal.is_active ? `Desmarcar ${goal.title} como principal` : `Marcar ${goal.title} como principal`
+                        }
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          toggleActiveGoal(goal)
+                        }}
+                      >
+                        {goal.is_active ? <IconStarOff size={16} /> : <IconStar size={16} />}
+                      </button>
+                      <button
+                        type="button"
+                        className="goal-icon-btn"
+                        aria-label={`Agregar aporte a ${goal.title}`}
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          openContribute(goal)
+                        }}
+                      >
+                        <IconPlus size={16} />
+                      </button>
+                    </span>
                   )}
                 </div>
 
@@ -523,20 +536,6 @@ export default function Goals() {
                       : `Sugerido: ${formatMoney(suggestedMonthly)}/mes para llegar el ${formatDateShort(goal.target_date)}.`}
                 </p>
 
-                {!completed && (
-                  <div className="goal-card-actions">
-                    <button
-                      type="button"
-                      className="gmail-scan-btn"
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        openContribute(goal)
-                      }}
-                    >
-                      <IconPlus size={14} /> Agregar aporte
-                    </button>
-                  </div>
-                )}
 
                 {expanded && (
                   <div className="tx-table-scroll" onClick={(e) => e.stopPropagation()}>

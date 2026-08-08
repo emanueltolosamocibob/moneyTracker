@@ -1542,41 +1542,56 @@ input[type='number'] {
   gap: 0.4rem;
 }
 
-.goal-tag-date {
+/* Las tres — fecha, "Principal", "Cumplido" — comparten el mismo box model
+   (padding/font-size/line-height/borde del mismo ancho, aunque sea
+   transparente en las que no lo necesitan) para que midan exactamente
+   igual una al lado de la otra pese a tener fuentes distintas (mono en la
+   fecha, heading en las demás). */
+.goal-tag-date,
+.goal-badge-active,
+.goal-badge-done {
+  display: inline-flex;
+  align-items: center;
   padding: 0.15rem 0.5rem;
   border-radius: var(--radius);
-  background: rgba(255, 255, 255, 0.1);
-  border: 1px solid rgba(255, 255, 255, 0.16);
-  color: rgba(255, 255, 255, 0.75);
+  border: 1px solid transparent;
   font-size: 0.75rem;
+  line-height: 1.3;
+}
+
+.goal-tag-date {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.16);
+  color: rgba(255, 255, 255, 0.75);
   font-family: var(--font-mono);
 }
 
 .goal-badge-active {
-  padding: 0.15rem 0.5rem;
-  border-radius: var(--radius);
   background: rgba(74, 222, 128, 0.18);
   color: var(--income);
-  font-size: 0.75rem;
   font-weight: 600;
 }
 
 /* Mismo recipe que .loan-badge-done pero dorado, para la tarjeta cumplida. */
 .goal-badge-done {
-  padding: 0.15rem 0.5rem;
-  border-radius: var(--radius);
   background: rgba(245, 197, 87, 0.2);
   color: #f5c557;
-  font-size: 0.75rem;
   font-weight: 600;
 }
 
-/* Estrella arriba a la derecha para marcar/desmarcar el objetivo principal
-   — misma pastilla translúcida que el resto de los íconos de acción, con un
-   estado "active" (dorado, ícono relleno) para el objetivo ya marcado. */
-.goal-star-btn {
-  flex-shrink: 0;
+.goal-card-top-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
   margin-left: auto;
+}
+
+/* Botones ícono arriba a la derecha (marcar/desmarcar principal, agregar
+   aporte) — misma pastilla translúcida en los dos estados, sin un color
+   "activo" propio: desmarcar se distingue por el ícono (estrella tachada,
+   ver IconStarOff), no por un cambio de color. */
+.goal-icon-btn {
+  flex-shrink: 0;
   padding: 0.3rem;
   border-radius: var(--radius);
   border: 1px solid rgba(255, 255, 255, 0.2);
@@ -1585,18 +1600,8 @@ input[type='number'] {
   cursor: pointer;
 }
 
-.goal-star-btn:hover {
+.goal-icon-btn:hover {
   background: rgba(255, 255, 255, 0.16);
-}
-
-.goal-star-btn.active {
-  border-color: rgba(245, 197, 87, 0.5);
-  background: rgba(245, 197, 87, 0.18);
-  color: #f5c557;
-}
-
-.goal-star-btn.active svg {
-  fill: currentColor;
 }
 
 .goal-ring-wrap {
@@ -1687,12 +1692,6 @@ input[type='number'] {
   color: var(--warning);
 }
 
-.goal-card-actions {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 0.5rem;
-}
 
 
 .budget-empty {
