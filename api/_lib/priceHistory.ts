@@ -24,9 +24,28 @@ export interface DailyBar extends DailyClose {
 }
 
 interface YahooChartResult {
-  meta?: { currency?: string; regularMarketPrice?: number }
+  meta?: {
+    currency?: string
+    regularMarketPrice?: number
+    // Zona horaria del mercado (offset en segundos respecto de UTC) y horario
+    // de la rueda en curso — los usa getIntradaySeries más abajo para agrupar
+    // por día local y para saber cuánto falta para el cierre sin hardcodear
+    // horarios por mercado (BYMA 11–17, NYSE 9:30–16).
+    exchangeTimezoneName?: string
+    fullExchangeName?: string
+    gmtoffset?: number
+    currentTradingPeriod?: { regular?: { start?: number; end?: number } }
+  }
   timestamp?: number[]
-  indicators?: { quote?: Array<{ open?: (number | null)[]; high?: (number | null)[]; low?: (number | null)[]; close?: (number | null)[] }> }
+  indicators?: {
+    quote?: Array<{
+      open?: (number | null)[]
+      high?: (number | null)[]
+      low?: (number | null)[]
+      close?: (number | null)[]
+      volume?: (number | null)[]
+    }>
+  }
 }
 
 interface YahooChartResponse {
@@ -160,6 +179,80 @@ export function createPriceLookup(fromMs: number) {
 function candidateSymbols(symbol: string): string[] {
   const clean = symbol.trim().toUpperCase()
   return clean.includes('.') ? [clean] : [clean, `${clean}.BA`]
+}
+
+// --- Intradiario ---
+//
+// Usado por api/investments/symbol-analysis.ts. Una sola llamada de 15m/60d
+// alcanza para todo el análisis: agregando las barras por día local salen las
+// velas diarias (para la media de volumen y la semana) y, sin pedir nada más,
+// el perfil intradiario que hace falta para el volumen relativo "a la misma
+// hora". No es solo una optimización: la serie *diaria* de Yahoo está vacía
+// para varios CEDEARs (VIST.BA devuelve una sola vela, la de hoy) mientras que
+// la de 15m devuelve ~57 ruedas del mismo papel.
+
+export interface IntradayBar {
+  // Epoch en segundos, UTC — la conversión al día/hora del mercado se hace con
+  // `gmtOffset`, no con la zona horaria del server (Vercel corre en UTC).
+  ts: number
+  open: number
+  high: number
+  low: number
+  close: number
+  volume: number
+}
+
+export interface IntradaySeries {
+  ticker: string
+  currency: string | null
+  exchangeName: string | null
+  timezone: string | null
+  gmtOffset: number
+  // Apertura y cierre de la rueda en curso (o de la próxima, si el mercado
+  // está cerrado), en epoch de segundos. Yahoo los da por mercado, así que el
+  // horario de BYMA sale del propio dato.
+  regularStart: number | null
+  regularEnd: number | null
+  bars: IntradayBar[]
+}
+
+export async function getIntradaySeries(
+  tickers: string[],
+  interval = '15m',
+  range = '60d',
+): Promise<IntradaySeries | null> {
+  for (const ticker of tickers) {
+    const result = await fetchYahooChart(ticker, { interval, range })
+    const timestamps = result?.timestamp
+    const quote = result?.indicators?.quote?.[0]
+    if (!timestamps?.length || !quote) continue
+
+    const bars: IntradayBar[] = []
+    for (let i = 0; i < timestamps.length; i += 1) {
+      const open = quote.open?.[i]
+      const high = quote.high?.[i]
+      const low = quote.low?.[i]
+      const close = quote.close?.[i]
+      // Igual que en las velas diarias: los huecos vienen como null en el
+      // medio del array. En intradiario además la última barra del día en
+      // curso puede estar todavía sin cerrar (volumen 0/null).
+      if (open == null || high == null || low == null || close == null) continue
+      bars.push({ ts: timestamps[i], open, high, low, close, volume: quote.volume?.[i] ?? 0 })
+    }
+    if (bars.length === 0) continue
+
+    return {
+      ticker,
+      currency: result?.meta?.currency ?? null,
+      exchangeName: result?.meta?.fullExchangeName ?? null,
+      timezone: result?.meta?.exchangeTimezoneName ?? null,
+      gmtOffset: result?.meta?.gmtoffset ?? 0,
+      regularStart: result?.meta?.currentTradingPeriod?.regular?.start ?? null,
+      regularEnd: result?.meta?.currentTradingPeriod?.regular?.end ?? null,
+      bars,
+    }
+  }
+  return null
 }
 
 // Velas diarias desde `since` (inclusive) hasta hoy, con un día de colchón

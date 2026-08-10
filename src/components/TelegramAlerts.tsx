@@ -1,10 +1,12 @@
-import { useEffect, useMemo, useState, type FormEvent, type MouseEvent } from 'react'
+import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { supabase } from '../lib/supabaseClient'
 import { useAuth } from '../lib/AuthContext'
 import type { TelegramSyncState } from '../types/database'
+import { openTickerTabs, tradingViewUrl } from '../lib/tradingView'
 import { IconDownload, IconPlus, IconRefresh } from './icons'
 import Modal from './Modal'
 import DateField from './DateField'
+import SymbolAnalysis from './SymbolAnalysis'
 
 const PERIODS = [
   { days: 30, label: '30 días' },
@@ -69,28 +71,6 @@ function formatPct(pct: number) {
   return `${pct > 0 ? '+' : ''}${pct.toFixed(1)}%`
 }
 
-function tradingViewUrl(ticker: string) {
-  return `https://www.tradingview.com/symbols/${encodeURIComponent(ticker)}/`
-}
-
-function tradingViewCedearUrl(ticker: string) {
-  return `https://www.tradingview.com/symbols/BCBA-${encodeURIComponent(ticker)}/`
-}
-
-// Un click abre las dos pestañas: el papel original y su CEDEAR en BCBA (el
-// mismo ticker suele cotizar en las dos plazas, ver CLAUDE.md sobre GGAL/
-// YPF/PAM). El href sigue apuntando al papel original — así clicks que no
-// disparan onClick (ctrl/cmd+click, click del medio, "abrir en pestaña
-// nueva" del menú contextual) siguen abriendo esa sola pestaña en vez de
-// quedar rotos.
-function openTickerTabs(e: MouseEvent<HTMLAnchorElement>, ticker: string) {
-  if (e.button === 1 || e.metaKey || e.ctrlKey || e.shiftKey) return
-  e.preventDefault()
-  e.stopPropagation()
-  window.open(tradingViewUrl(ticker), '_blank', 'noopener,noreferrer')
-  window.open(tradingViewCedearUrl(ticker), '_blank', 'noopener,noreferrer')
-}
-
 // Mismo parseo local que formatDate (no new Date(dateStr) directo, que
 // interpreta la fecha en UTC y puede dar un día de diferencia según el huso
 // horario del navegador).
@@ -116,8 +96,13 @@ export default function TelegramAlerts() {
   const [syncProgress, setSyncProgress] = useState(0)
   const [error, setError] = useState<string | null>(null)
 
-  // Alerta en edición — se abre con doble click sobre su fila (mismo gesto
-  // que Loans.tsx usa para editar una cuota).
+  // Alerta en análisis — doble click sobre su fila. El doble click antes abría
+  // directo el modal de edición; ahora abre el análisis del símbolo, que tiene
+  // el botón "Editar" arriba a la derecha (mismo patrón que las tarjetas de
+  // Cartera actual). El click sobre el ticker sigue yendo a TradingView.
+  const [analysisAlert, setAnalysisAlert] = useState<BuyAlert | null>(null)
+
+  // Alerta en edición — se abre desde el botón "Editar alerta" del análisis.
   const [editingAlert, setEditingAlert] = useState<BuyAlert | null>(null)
   const [editDate, setEditDate] = useState('')
   const [editTicker, setEditTicker] = useState('')
@@ -467,7 +452,7 @@ export default function TelegramAlerts() {
             </thead>
             <tbody>
               {filteredAlerts.map((alert) => (
-                <tr key={alert.id} onDoubleClick={() => openEditAlert(alert)}>
+                <tr key={alert.id} onDoubleClick={() => setAnalysisAlert(alert)}>
                   <td>{formatDate(alert.date)}</td>
                   <td className="tx-amount">
                     <a
@@ -477,6 +462,11 @@ export default function TelegramAlerts() {
                       className="tg-ticker-link"
                       title="Abre el papel y su CEDEAR en TradingView"
                       onClick={(e) => openTickerTabs(e, alert.ticker)}
+                      /* El ticker es el único lugar de la fila donde el doble
+                         click no abre el análisis: ahí ya significa "ir a
+                         TradingView", y el análisis se abre igual desde
+                         cualquier otra celda. */
+                      onDoubleClick={(e) => e.stopPropagation()}
                     >
                       {alert.ticker}
                     </a>
@@ -529,6 +519,42 @@ export default function TelegramAlerts() {
             </p>
           </div>
         </Modal>
+      )}
+
+      {analysisAlert && (
+        <SymbolAnalysis
+          symbol={analysisAlert.ticker}
+          name={analysisAlert.companyName}
+          contextTitle="La alerta"
+          contextRows={[
+            { label: 'Fecha de la alerta', value: formatDate(analysisAlert.date) },
+            {
+              label: 'Ganancia estimada',
+              value: analysisAlert.possibleGainPct != null ? `+${analysisAlert.possibleGainPct.toFixed(2)}%` : '—',
+            },
+            { label: 'Stop loss', value: analysisAlert.stopLossPct != null ? `-${analysisAlert.stopLossPct.toFixed(2)}%` : '—' },
+            {
+              label: '% desde la alerta',
+              value:
+                analysisAlert.changePct != null ? (
+                  <span className={analysisAlert.changePct >= 0 ? 'tg-hit' : 'tg-miss'}>{formatPct(analysisAlert.changePct)}</span>
+                ) : (
+                  '—'
+                ),
+            },
+            { label: 'Estado', value: analysisAlert.status === 'open' ? 'Abierta' : 'Cerrada' },
+            {
+              label: 'Días',
+              value: analysisAlert.sellDate ? daysBetween(analysisAlert.date, analysisAlert.sellDate) : '—',
+            },
+          ]}
+          editLabel="Editar alerta"
+          onEdit={() => {
+            openEditAlert(analysisAlert)
+            setAnalysisAlert(null)
+          }}
+          onClose={() => setAnalysisAlert(null)}
+        />
       )}
 
       {editingAlert && (
