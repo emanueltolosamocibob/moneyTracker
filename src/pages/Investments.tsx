@@ -5,6 +5,7 @@ import type { InvestmentLot, InvestmentMarket, InvestmentSale } from '../types/d
 import { IconChevronDown, IconPlus, IconX } from '../components/icons'
 import Modal from '../components/Modal'
 import SymbolSearch from '../components/SymbolSearch'
+import SymbolAnalysis from '../components/SymbolAnalysis'
 import DateField from '../components/DateField'
 import TelegramAlerts from '../components/TelegramAlerts'
 import SpyBenchmark from '../components/SpyBenchmark'
@@ -88,6 +89,11 @@ export default function Investments() {
   const [quantity, setQuantity] = useState('')
   const [saving, setSaving] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
+
+  // Tenencia en análisis — doble click sobre su tarjeta en Cartera actual.
+  // Ese gesto antes abría directo el modal de editar compra; ahora abre el
+  // análisis, que tiene el botón "Editar" arriba a la derecha.
+  const [analysisHolding, setAnalysisHolding] = useState<Holding | null>(null)
 
   const [sellHolding, setSellHolding] = useState<Holding | null>(null)
   const [sellQuantity, setSellQuantity] = useState('')
@@ -571,7 +577,7 @@ export default function Investments() {
               <div
                 key={`${h.symbol}__${h.market}`}
                 className="holding-card"
-                onDoubleClick={() => openLotEdit(h.lots[0], h.lots.length - 1)}
+                onDoubleClick={() => setAnalysisHolding(h)}
               >
                 <div className="holding-card-top">
                   <span className="holding-symbol-group">
@@ -669,6 +675,21 @@ export default function Investments() {
 
           <SpyBenchmark />
         </>
+      )}
+
+      {analysisHolding && (
+        <SymbolAnalysis
+          symbol={analysisHolding.symbol}
+          market={analysisHolding.market}
+          name={analysisHolding.name}
+          position={{ quantity: analysisHolding.totalQuantity, avgPrice: analysisHolding.avgBuyPrice }}
+          editLabel="Editar compra"
+          onEdit={() => {
+            openLotEdit(analysisHolding.lots[0], analysisHolding.lots.length - 1)
+            setAnalysisHolding(null)
+          }}
+          onClose={() => setAnalysisHolding(null)}
+        />
       )}
 
       {sellHolding && (

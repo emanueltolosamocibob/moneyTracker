@@ -1316,6 +1316,33 @@ input[type='number'] {
   max-width: 720px;
 }
 
+/* Para diálogos largos (el análisis de un símbolo son seis bloques): el panel
+   scrollea internamente en vez de desbordar la pantalla — .modal-overlay está
+   centrado y no tiene scroll propio, así que sin esto las puntas del panel
+   quedan fuera del viewport. Pisa el overflow:visible que .modal-panel necesita
+   para el calendario de DateField, que estos modales no usan. */
+.modal-panel-scroll {
+  max-height: calc(100vh - 2rem);
+  max-height: calc(100dvh - 2rem);
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.35) rgba(255, 255, 255, 0.08);
+}
+
+.modal-panel-scroll::-webkit-scrollbar {
+  width: 8px;
+}
+
+.modal-panel-scroll::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 4px;
+}
+
+.modal-panel-scroll::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.35);
+  border-radius: 4px;
+}
+
 .modal-panel .tx-table-scroll {
   margin-bottom: 1.25rem;
 }
@@ -2686,6 +2713,229 @@ input[type='number'] {
   max-width: 22rem;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+/* --- Análisis de un símbolo (modal de doble click, ver SymbolAnalysis.tsx) --- */
+
+.sa-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.sa-title {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 0;
+}
+
+/* Mismo tratamiento que .holding-symbol (mono, grande) — es el mismo dato,
+   solo que acá además linkea a TradingView como en la tabla de alertas. */
+.sa-symbol {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 1.6rem;
+  line-height: 1;
+  color: inherit;
+  text-decoration: none;
+}
+
+.sa-symbol:hover {
+  text-decoration: underline;
+}
+
+.sa-name {
+  color: rgba(255, 255, 255, 0.55);
+  font-size: 0.85rem;
+}
+
+.sa-edit-btn {
+  flex-shrink: 0;
+}
+
+.sa-body {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.sa-market {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.sa-market-meta {
+  color: rgba(255, 255, 255, 0.55);
+  font-size: 0.78rem;
+}
+
+.sa-block h4 {
+  margin: 0 0 0.6rem;
+  font-family: var(--font-heading);
+  font-size: 0.95rem;
+  font-weight: 700;
+}
+
+/* 138px y no 150: con el ancho del panel en un viewport de 375px, 150 deja
+   una sola columna y los seis datos quedan en una tira muy larga. */
+.sa-stat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(138px, 1fr));
+  gap: 0.6rem;
+}
+
+.sa-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  padding: 0.6rem 0.7rem;
+  border-radius: var(--radius);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.sa-stat-label {
+  color: rgba(255, 255, 255, 0.55);
+  font-size: 0.72rem;
+}
+
+.sa-stat strong {
+  font-family: var(--font-mono);
+  font-size: 0.95rem;
+}
+
+/* Perfil de volumen por hora: dos barras apiladas por fila (la rueda de hoy
+   sobre el promedio de las anteriores) en vez de un gráfico — es una
+   comparación de dos valores, no una serie. */
+.sa-hours {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  margin-top: 0.9rem;
+}
+
+.sa-hour {
+  display: grid;
+  grid-template-columns: 3rem 1fr 5rem;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.sa-hour-label,
+.sa-hour-value {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.sa-hour-value {
+  text-align: right;
+}
+
+.sa-hour-bars {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.sa-hour-bar {
+  display: block;
+  height: 5px;
+  min-width: 1px;
+  border-radius: var(--radius);
+}
+
+.sa-hour-today {
+  background: rgba(255, 255, 255, 0.8);
+}
+
+.sa-hour-avg {
+  background: rgba(255, 255, 255, 0.25);
+}
+
+.modal-panel .sa-legend {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin: 0.5rem 0 0;
+  font-size: 0.7rem;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.sa-legend-key {
+  display: inline-block;
+  width: 0.9rem;
+  height: 0.45rem;
+  border-radius: var(--radius);
+}
+
+.sa-legend-key + .sa-legend-key,
+.sa-legend .sa-hour-avg {
+  margin-left: 0.6rem;
+}
+
+.sa-readings {
+  list-style: none;
+  margin: 0.9rem 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.sa-readings li {
+  padding-left: 0.7rem;
+  border-left: 2px solid rgba(255, 255, 255, 0.25);
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 0.85rem;
+  line-height: 1.4;
+}
+
+.sa-table {
+  font-size: 0.82rem;
+}
+
+/* Bloque final: todos los números, los captados y los calculados. Dos
+   columnas de pares dato/valor, con el valor en mono para que la columna
+   derecha lea como una tabla de datos. */
+.sa-summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: 0 1.25rem;
+  margin: 0;
+}
+
+.sa-summary div {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.35rem 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.sa-summary dt {
+  color: rgba(255, 255, 255, 0.55);
+  font-size: 0.78rem;
+}
+
+.sa-summary dd {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: 0.82rem;
+  white-space: nowrap;
+}
+
+.modal-panel .sa-disclaimer {
+  margin: 0.9rem 0 0;
+  font-size: 0.72rem;
+  line-height: 1.4;
+  color: rgba(255, 255, 255, 0.45);
 }
 
 /* Mobile: la sidebar pasa de columna lateral fija a una barra superior
