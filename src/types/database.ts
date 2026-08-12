@@ -48,6 +48,10 @@ export interface Transaction {
   // cualquier otra transacción. on delete cascade en la FK: borrar el
   // loan_payment (o el préstamo entero) borra también esta fila.
   loan_payment_id: string | null
+  // Igual que loan_payment_id pero para un service o visita al mecánico
+  // (ver Vehicles.tsx) — mismo cascade, misma exclusividad de hecho: una
+  // transacción nunca tiene los dos.
+  vehicle_expense_id: string | null
   created_at: string
 }
 
@@ -134,6 +138,49 @@ export interface LoanPayment {
   // Valor de la UVA en pesos el día de este pago (null para préstamos en
   // ARS, o para pagos UVA cargados antes de que existiera esta columna).
   uva_value: number | null
+  created_at: string
+}
+
+export type VehicleType = 'car' | 'suv' | 'pickup' | 'van' | 'moto'
+
+export interface Vehicle {
+  id: string
+  user_id: string
+  type: VehicleType
+  brand: string
+  model: string
+  year: number
+  /** Hex '#rrggbb' — con esto se tiñe la silueta de la tarjeta. */
+  color: string
+  license_plate: string | null
+  current_km: number | null
+  // Los tres de abajo los completa /api/vehicles/info (estimados por LLM) y
+  // se pueden corregir a mano. null = todavía no se consultó.
+  consumption_l100km: number | null
+  service_interval_km: number | null
+  fuel_type: string | null
+  insurance_company: string | null
+  /** Path dentro del bucket privado 'vehicle-docs', no una URL. */
+  insurance_pdf_path: string | null
+  insurance_expires_on: string | null // 'YYYY-MM-DD'
+  vtv_expires_on: string | null // 'YYYY-MM-DD'
+  created_at: string
+}
+
+export type VehicleExpenseKind = 'service' | 'mechanic'
+
+/** Un service o una visita al mecánico — misma tabla, ver migración 0022. */
+export interface VehicleExpense {
+  id: string
+  user_id: string
+  vehicle_id: string
+  kind: VehicleExpenseKind
+  occurred_on: string // 'YYYY-MM-DD'
+  title: string
+  description: string | null
+  odometer_km: number | null
+  cost: number
+  place: string | null
   created_at: string
 }
 
@@ -358,6 +405,18 @@ export interface Database {
         Row: TradeSignal
         Insert: Partial<TradeSignal>
         Update: Partial<TradeSignal>
+        Relationships: []
+      }
+      vehicles: {
+        Row: Vehicle
+        Insert: Partial<Vehicle>
+        Update: Partial<Vehicle>
+        Relationships: []
+      }
+      vehicle_expenses: {
+        Row: VehicleExpense
+        Insert: Partial<VehicleExpense>
+        Update: Partial<VehicleExpense>
         Relationships: []
       }
     }

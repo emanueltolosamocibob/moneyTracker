@@ -10,6 +10,7 @@ import Budgets from './pages/Budgets'
 import Investments from './pages/Investments'
 import Loans from './pages/Loans'
 import Goals from './pages/Goals'
+import Vehicles from './pages/Vehicles'
 import Settings from './pages/Settings'
 
 export default function App() {
@@ -32,6 +33,7 @@ export default function App() {
           <Route path="investments" element={<Investments />} />
           <Route path="loans" element={<Loans />} />
           <Route path="goals" element={<Goals />} />
+          <Route path="vehicles" element={<Vehicles />} />
           <Route path="settings" element={<Settings />} />
         </Route>
       </Routes>

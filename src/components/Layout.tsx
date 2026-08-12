@@ -4,6 +4,7 @@ import { useAuth } from '../lib/AuthContext'
 import { supabase } from '../lib/supabaseClient'
 import {
   IconBank,
+  IconCar,
   IconChevronDown,
   IconHome,
   IconLogout,
@@ -85,6 +86,9 @@ export default function Layout() {
           </NavLink>
           <NavLink to="/goals" className="nav-btn">
             <IconPiggyBank /> <span className="nav-label">Objetivos</span>
+          </NavLink>
+          <NavLink to="/vehicles" className="nav-btn">
+            <IconCar /> <span className="nav-label">Vehículos</span>
           </NavLink>
           <NavLink to="/settings" className="nav-btn">
             <IconSettings /> <span className="nav-label">Configuración</span>
