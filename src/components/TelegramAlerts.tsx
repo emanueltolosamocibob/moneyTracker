@@ -54,6 +54,10 @@ interface BuyAlert {
   // true si se cargó a mano (botón "+ Agregar alerta"), sin mensaje real de
   // Telegram detrás.
   isManual: boolean
+  // % de la rueda de hoy contra su propia apertura — null en alertas
+  // cerradas (no se pide, la rueda de hoy no es parte de la operación) o
+  // cuando Yahoo no tiene el dato.
+  todayChangePct: number | null
 }
 
 // Tope de vueltas del loop de sincronización. El backfill de un grupo con años
@@ -445,6 +449,7 @@ export default function TelegramAlerts() {
                 <th className="tx-amount-header">Ganancia estimada</th>
                 <th className="tx-amount-header">Stop loss</th>
                 <th className="tx-amount-header">% desde la alerta</th>
+                <th className="tx-amount-header">% en el día</th>
                 <th>Fecha de venta</th>
                 <th className="tx-amount-header">Días</th>
                 <th>Estado</th>
@@ -455,6 +460,7 @@ export default function TelegramAlerts() {
                 <tr key={alert.id} onDoubleClick={() => setAnalysisAlert(alert)}>
                   <td>{formatDate(alert.date)}</td>
                   <td className="tx-amount">
+                    {alert.isManual && <span className="tg-badge">Manual</span>}
                     <a
                       href={tradingViewUrl(alert.ticker)}
                       target="_blank"
@@ -470,7 +476,6 @@ export default function TelegramAlerts() {
                     >
                       {alert.ticker}
                     </a>
-                    {alert.isManual && <span className="tg-badge">Manual</span>}
                   </td>
                   <td className="tg-company">{alert.companyName ?? <span className="tg-muted">—</span>}</td>
                   <td className="tx-amount">{alert.possibleGainPct != null ? `+${alert.possibleGainPct.toFixed(2)}%` : '—'}</td>
@@ -488,6 +493,13 @@ export default function TelegramAlerts() {
                       <span className="tg-muted" title="No se consiguió serie de precios para este símbolo">
                         —
                       </span>
+                    )}
+                  </td>
+                  <td className="tx-amount">
+                    {alert.todayChangePct != null ? (
+                      <span className={alert.todayChangePct >= 0 ? 'tg-hit' : 'tg-miss'}>{formatPct(alert.todayChangePct)}</span>
+                    ) : (
+                      <span className="tg-muted">—</span>
                     )}
                   </td>
                   <td>{alert.sellDate ? formatDate(alert.sellDate) : <span className="tg-muted">—</span>}</td>

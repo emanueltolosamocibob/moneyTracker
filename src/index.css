@@ -2695,7 +2695,7 @@ input[type='number'] {
 
 .tg-badge {
   display: inline-block;
-  margin-left: 0.5rem;
+  margin-right: 0.5rem;
   padding: 0.1rem 0.4rem;
   border-radius: var(--radius);
   border: 1px solid rgba(255, 255, 255, 0.2);

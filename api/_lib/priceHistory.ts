@@ -172,6 +172,31 @@ export function createPriceLookup(fromMs: number) {
   }
 }
 
+export interface TodayChange {
+  openPrice: number
+  currentPrice: number
+  changePct: number
+}
+
+// % de la rueda de hoy contra su propia apertura (no contra el cierre de
+// ayer) — mismo orden .BA-primero que resolveSeries, ya que la tabla de
+// alertas de compra nombra papeles de ByMA. `range=1d&interval=1d` da una
+// sola barra (la de hoy, en curso) con su open; el precio actual sale de
+// `meta.regularMarketPrice`, no del close de esa barra (que todavía no cerró).
+export async function getTodayChangePct(symbol: string): Promise<TodayChange | null> {
+  const clean = symbol.trim().toUpperCase()
+  if (!clean) return null
+  for (const ticker of [`${clean}.BA`, clean]) {
+    const result = await fetchYahooChart(ticker, { range: '1d', interval: '1d' })
+    const openPrice = result?.indicators?.quote?.[0]?.open?.[0]
+    const currentPrice = result?.meta?.regularMarketPrice
+    if (openPrice != null && currentPrice != null) {
+      return { openPrice, currentPrice, changePct: ((currentPrice - openPrice) / openPrice) * 100 }
+    }
+  }
+  return null
+}
+
 // Usado por api/investments/spy-benchmark.ts. A diferencia de resolveSeries
 // de arriba (pensado para un grupo genérico que puede nombrar papeles de
 // ByMA), acá se prueba el ticker pelado primero y el sufijo .BA solo como

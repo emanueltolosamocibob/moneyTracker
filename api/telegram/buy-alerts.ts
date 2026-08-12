@@ -1,7 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { getUserIdFromRequest, supabaseAdmin } from '../_lib/supabaseAdmin.js'
 import { extractDisplayFields } from '../_lib/parseSignal.js'
-import { createPriceLookup } from '../_lib/priceHistory.js'
+import { createPriceLookup, getTodayChangePct, type TodayChange } from '../_lib/priceHistory.js'
 
 const DEFAULT_DAYS = 90
 const MAX_DAYS = 365
@@ -276,6 +276,19 @@ async function handleGet(req: VercelRequest, res: VercelResponse, userId: string
   // alertas no vuelve a pedir la serie.
   const evaluate = createPriceLookup(fromMs)
 
+  // % en el día (contra la apertura de hoy) — solo tiene sentido para
+  // alertas abiertas, pero se pide por ticker una sola vez acá igual que
+  // `evaluate` cachea por símbolo dentro de esta misma corrida.
+  const todayChangeCache = new Map<string, Promise<TodayChange | null>>()
+  function todayChangeFor(ticker: string) {
+    let pending = todayChangeCache.get(ticker)
+    if (!pending) {
+      pending = getTodayChangePct(ticker)
+      todayChangeCache.set(ticker, pending)
+    }
+    return pending
+  }
+
   const alerts = await Promise.all(
     (signals ?? [])
       .filter((s) => s.ticker)
@@ -296,6 +309,9 @@ async function handleGet(req: VercelRequest, res: VercelResponse, userId: string
         // (símbolo sin serie ahí) pero el usuario sabe el resultado real.
         const changePctSource: 'manual' | 'computed' | null =
           s.reported_result_pct != null ? 'manual' : outcome?.changePct != null ? 'computed' : null
+        // Cerrada: la rueda de hoy no es parte de la operación, no vale la
+        // pena pedirla.
+        const todayChange = sellDate ? null : await todayChangeFor(s.ticker!)
         return {
           id: s.id,
           date: s.posted_at.slice(0, 10),
@@ -311,6 +327,7 @@ async function handleGet(req: VercelRequest, res: VercelResponse, userId: string
           manualSellDate: s.manual_sell_date,
           status: sellDate ? 'closed' : 'open',
           isManual: s.is_manual,
+          todayChangePct: todayChange?.changePct ?? null,
         }
       }),
   )
