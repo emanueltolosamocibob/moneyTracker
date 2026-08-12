@@ -47,10 +47,7 @@ export type ExtractedTransaction = z.infer<typeof extractionSchema>
 const MIN_GEMINI_CALL_INTERVAL_MS = 4_500
 let lastGeminiCallAt = 0
 
-// Exportada porque la cuota de Gemini es por proyecto, no por ruta: cualquier
-// otra función que llame al mismo modelo (hoy api/vehicles/info.ts) tiene que
-// compartir este contador o se pisan entre sí.
-export async function throttleGeminiCall() {
+async function throttleGeminiCall() {
   const wait = lastGeminiCallAt + MIN_GEMINI_CALL_INTERVAL_MS - Date.now()
   if (wait > 0) await new Promise((resolve) => setTimeout(resolve, wait))
   lastGeminiCallAt = Date.now()

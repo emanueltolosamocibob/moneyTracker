@@ -121,28 +121,6 @@ En su lugar queda **`src/components/SpyBenchmark.tsx`**, un solo número de refe
 
 **Todo este bloque (`TelegramAlerts` + `SpyBenchmark` en `Investments.tsx`) está oculto detrás de un chequeo de email** (`TELEGRAM_FEATURE_EMAIL` en `Investments.tsx`, hardcodeado — hoy solo existe una cuenta real). Es intencional: la feature está atada a una sola cuenta de Telegram (`TELEGRAM_SESSION`), así que no tiene sentido que la vea un usuario de prueba distinto (p. ej. un tester agregado para probar el login de Google). **Es un gate solo de UI** — los endpoints (`/api/telegram/*`, `/api/investments/spy-benchmark.ts`) siguen respondiendo a cualquier JWT válido; no exponen datos ajenos (todo sigue escopeado por `user_id`), pero si otra cuenta llamara a `/api/telegram/sync` sí dispararía un sync real contra el mismo canal bajo su propio `user_id`. Si en algún momento hay más de una cuenta real usando la app, esto necesita un candado del lado del servidor también, no solo ocultar el componente.
 
-### Vehículos
-
-`src/pages/Vehicles.tsx`: tarjetas por vehículo y un modal de detalle con cuatro paneles (consumo, seguro, services, mecánico). Migración `0022_vehicles.sql`.
-
-**No hay modelo 3D en la tarjeta y no es por falta de ganas**: no existe ninguna API gratuita que devuelva un GLB por marca/modelo/año. Sketchfab tiene búsqueda por API pero la descarga es OAuth por modelo y la mayoría no son descargables (licencia por autor); CGTrader/TurboSquid son marketplaces pagos sin endpoint. Aun con una fuente, `three.js` + un GLB de varios MB por tarjeta es mucho peso para algo decorativo. En su lugar `src/components/VehicleSilhouette.tsx` dibuja una silueta SVG inline por tipo (`car`/`suv`/`pickup`/`van`/`moto`), teñida con el color cargado. La moto es la única que además usa trazos sin relleno (`strokes`): su horquilla, manubrio y basculante son barras finas, y con un solo path relleno queda un borrón entre las dos ruedas.
-
-**Un service y una visita al mecánico son la misma tabla** (`vehicle_expenses`, discriminadas por `kind`): comparten todos los campos salvo el kilometraje, así que separarlas serían dos CRUD gemelos, dos forms y dos links a `transactions` para nada. Cada gasto con costo > 0 genera su egreso en Transacciones bajo la categoría `Vehículos` (creada sola la primera vez, igual que `Préstamos` en `Loans.tsx`), linkeado por `transactions.vehicle_expense_id` con `on delete cascade` — mismo patrón que `loan_payment_id` (ver `0017`). Un service en garantía (costo 0) no genera transacción.
-
-**El consumo promedio y el intervalo de service son columnas del vehículo, no una tabla de specs cacheada por (marca, modelo, año).** `api/vehicles/info.ts` (**la función 12 de las 12** del plan Hobby — a partir de acá cualquier ruta nueva se pliega en un archivo existente por método HTTP) le pregunta a Gemini una sola vez, al crear el vehículo, y el resultado queda en la fila editable a mano. No hay API gratis de specs de autos: las que existen son pagas o solo cubren EE.UU. Comparte el `throttleGeminiCall` exportado desde `categorize.ts` porque la cuota de Gemini es por proyecto. El prompt pide explícitamente `null` cuando no conoce el modelo en vez de estimar por analogía, y la UI marca el dato como estimado — un LLM no sabe cuánto consume un auto puntual y lo puede inventar igual.
-
-**Los recordatorios se calculan en código**, nunca se guardan: `src/lib/vehicleAlerts.ts` deriva "próximo service" (km del service de mayor odómetro + intervalo, avisa a menos de 1000 km) y los vencimientos de póliza y VTV (avisa a 30 días). Toma `today` como parámetro justamente para que `vehicleAlerts.check.ts` pueda fijar la fecha; ese check es el único test del repo y corre sin framework porque Node 24 lee TypeScript directo:
-
-```bash
-node --experimental-strip-types src/lib/vehicleAlerts.check.ts
-```
-
-Ese archivo importa `./vehicleAlerts.ts` **con la extensión puesta** — Node lo carga como ESM nativo y, igual que los imports bajo `api/`, no resuelve especificadores relativos sin extensión. Compila igual porque `tsconfig.app.json` ya tiene `allowImportingTsExtensions`.
-
-**El PDF de la póliza es el primer uso de Supabase Storage en la app**: bucket `vehicle-docs`, privado. No hay URL fija guardada (la columna es `insurance_pdf_path`, un path) — se firma una URL de 60s al abrirlo. El aislamiento entre usuarios es por convención de path: cada archivo va en `<user_id>/...` y la política de `storage.objects` compara esa primera carpeta contra `auth.uid()`, que es el equivalente en Storage al `auth.uid() = user_id` del resto de las tablas. Subir una póliza nueva borra la anterior del bucket.
-
-El picker de color es el **único control nativo que queda en la app** (a diferencia de `Select`/`DateField`/`Modal`, que reemplazan al suyo): no se puede restylear el popup, pero reemplazarlo sería escribir un selector de color entero para algo que se usa dos veces. Su regla CSS va calificada con el form contenedor (`.tx-form > .vehicle-color-input`) porque `.tx-form > input { flex: 1 1 160px }` tiene más especificidad que una clase sola — sin eso el picker se estira a todo el ancho de la fila. Es el mismo pitfall de inputs copiados por contexto que está documentado abajo.
-
 ### UI conventions: colors, fonts, buttons, inputs, dialogs, scrollbars
 
 All of this lives in the one global `src/index.css` (no CSS modules, no styled-components, no Tailwind) — every page/component just reaches for these shared classes rather than writing its own variant. When adding a new form or panel, match these instead of inventing new styles.
