@@ -172,29 +172,30 @@ export function createPriceLookup(fromMs: number) {
   }
 }
 
-export interface TodayChange {
-  openPrice: number
-  currentPrice: number
+export interface DayChange {
+  prevClose: number
+  lastClose: number
   changePct: number
 }
 
-// % de la rueda de hoy contra su propia apertura (no contra el cierre de
-// ayer) — mismo orden .BA-primero que resolveSeries, ya que la tabla de
-// alertas de compra nombra papeles de ByMA. `range=1d&interval=1d` da una
-// sola barra (la de hoy, en curso) con su open; el precio actual sale de
-// `meta.regularMarketPrice`, no del close de esa barra (que todavía no cerró).
-export async function getTodayChangePct(symbol: string): Promise<TodayChange | null> {
+// Variación del día contra el cierre anterior — mismo criterio que
+// `session.changePct` de api/investments/symbol-analysis.ts (no el gap
+// contra la apertura, que es otra cosa). Trae las últimas ruedas diarias
+// (mismo orden .BA-primero que resolveSeries) y compara las dos últimas: si
+// el mercado está cerrado, la "última rueda" ya es la de hoy con su cierre
+// puesto, así que sale la variación del día sin ninguna rama especial para
+// mercado abierto/cerrado.
+export async function getDayChangePct(symbol: string): Promise<DayChange | null> {
   const clean = symbol.trim().toUpperCase()
   if (!clean) return null
-  for (const ticker of [`${clean}.BA`, clean]) {
-    const result = await fetchYahooChart(ticker, { range: '1d', interval: '1d' })
-    const openPrice = result?.indicators?.quote?.[0]?.open?.[0]
-    const currentPrice = result?.meta?.regularMarketPrice
-    if (openPrice != null && currentPrice != null) {
-      return { openPrice, currentPrice, changePct: ((currentPrice - openPrice) / openPrice) * 100 }
-    }
-  }
-  return null
+  const fromMs = Date.now() - 10 * 86_400_000
+  const toMs = Date.now()
+  const bars = (await fetchYahooBars(`${clean}.BA`, fromMs, toMs)) ?? (await fetchYahooBars(clean, fromMs, toMs))
+  if (!bars || bars.length < 2) return null
+  const last = bars[bars.length - 1]
+  const prev = bars[bars.length - 2]
+  if (!(prev.close > 0)) return null
+  return { prevClose: prev.close, lastClose: last.close, changePct: ((last.close - prev.close) / prev.close) * 100 }
 }
 
 // Usado por api/investments/spy-benchmark.ts. A diferencia de resolveSeries

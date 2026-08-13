@@ -54,10 +54,11 @@ interface BuyAlert {
   // true si se cargó a mano (botón "+ Agregar alerta"), sin mensaje real de
   // Telegram detrás.
   isManual: boolean
-  // % de la rueda de hoy contra su propia apertura — null en alertas
-  // cerradas (no se pide, la rueda de hoy no es parte de la operación) o
-  // cuando Yahoo no tiene el dato.
-  todayChangePct: number | null
+  // Variación del día contra el cierre anterior — mismo criterio que "Var.
+  // del día" en el análisis de símbolo. null en alertas cerradas (no se
+  // pide, la rueda de hoy no es parte de la operación) o cuando Yahoo no
+  // tiene el dato.
+  dayChangePct: number | null
 }
 
 // Tope de vueltas del loop de sincronización. El backfill de un grupo con años
@@ -449,7 +450,7 @@ export default function TelegramAlerts() {
                 <th className="tx-amount-header">Ganancia estimada</th>
                 <th className="tx-amount-header">Stop loss</th>
                 <th className="tx-amount-header">% desde la alerta</th>
-                <th className="tx-amount-header">% en el día</th>
+                <th className="tx-amount-header">Var. del día</th>
                 <th>Fecha de venta</th>
                 <th className="tx-amount-header">Días</th>
                 <th>Estado</th>
@@ -496,8 +497,8 @@ export default function TelegramAlerts() {
                     )}
                   </td>
                   <td className="tx-amount">
-                    {alert.todayChangePct != null ? (
-                      <span className={alert.todayChangePct >= 0 ? 'tg-hit' : 'tg-miss'}>{formatPct(alert.todayChangePct)}</span>
+                    {alert.dayChangePct != null ? (
+                      <span className={alert.dayChangePct >= 0 ? 'tg-hit' : 'tg-miss'}>{formatPct(alert.dayChangePct)}</span>
                     ) : (
                       <span className="tg-muted">—</span>
                     )}
