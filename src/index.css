@@ -1269,6 +1269,12 @@ input[type='number'] {
   font-size: 2.2rem;
 }
 
+.tx-summary span.tx-summary-usd {
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  color: rgba(255, 255, 255, 0.45);
+}
+
 .tx-summary > div:first-child .tx-amount,
 .tx-summary-net .tx-amount {
   font-size: 1.3rem;

@@ -14,6 +14,36 @@ function formatCurrency(amount: number, currency: string) {
   return amount.toLocaleString('es-AR', { style: 'currency', currency })
 }
 
+interface DolarRow {
+  fecha: string
+  venta: number
+}
+
+// Mismo criterio que api/uva/value.ts (onOrBefore): el dólar oficial de "hoy"
+// no está publicado hasta que cierra la rueda, así que se toma el último
+// valor disponible en o antes de hoy. CORS abierto en esta API (a diferencia
+// de UVA) así que se pide directo desde el cliente, sin ruta propia en api/.
+async function fetchOfficialDollarRate(): Promise<number | null> {
+  try {
+    const res = await fetch('https://api.argentinadatos.com/v1/cotizaciones/dolares/oficial')
+    if (!res.ok) return null
+    const rows = (await res.json()) as DolarRow[]
+    const todayStr = todayDateStr()
+    const onOrBefore = rows.filter((r) => r.fecha <= todayStr).sort((a, b) => (a.fecha < b.fecha ? 1 : -1))
+    return onOrBefore[0]?.venta ?? null
+  } catch {
+    return null
+  }
+}
+
+// Convierte a pesos el gasto de una transacción, sea cual sea su moneda. Si
+// es USD y todavía no tenemos la cotización (falló el fetch), la ignora en
+// vez de sumar el número crudo como si fueran pesos.
+function spentInARS(t: { amount: number; currency: string }, dollarRate: number | null) {
+  if (t.currency === 'USD') return dollarRate ? t.amount * dollarRate : 0
+  return t.amount
+}
+
 // Mismo estilo que el monto de Transactions.tsx, pero sin la máscara de
 // centavos: acá cada dígito tipeado es un peso entero, no el último par de
 // centavos (los presupuestos se definen en pesos redondos).
@@ -120,7 +150,8 @@ export default function Budgets() {
   const [categories, setCategories] = useState<Category[]>([])
   const [period, setPeriod] = useState<BudgetPeriod | null>(null)
   const [items, setItems] = useState<BudgetItem[]>([])
-  const [spentTx, setSpentTx] = useState<{ category_id: string | null; amount: number }[]>([])
+  const [spentTx, setSpentTx] = useState<{ category_id: string | null; amount: number; currency: string }[]>([])
+  const [dollarRate, setDollarRate] = useState<number | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -144,6 +175,8 @@ export default function Budgets() {
     if (!user) return
     setLoading(true)
     setError(null)
+
+    fetchOfficialDollarRate().then(setDollarRate)
 
     const { data: cats } = await supabase.from('categories').select('*').order('name')
     setCategories(cats ?? [])
@@ -211,7 +244,7 @@ export default function Budgets() {
 
       const { data: tx } = await supabase
         .from('transactions')
-        .select('category_id, amount')
+        .select('category_id, amount, currency')
         .eq('type', 'expense')
         .gte('occurred_at', dateInputToISOStart(current.period_start))
         .lt('occurred_at', dateInputToISOEndExclusive(current.period_end))
@@ -230,12 +263,15 @@ export default function Budgets() {
   }, [user])
 
   const totalBudgeted = useMemo(() => items.reduce((sum, it) => sum + it.amount, 0), [items])
-  const totalSpent = useMemo(() => spentTx.reduce((sum, t) => sum + t.amount, 0), [spentTx])
+  const totalSpent = useMemo(
+    () => spentTx.reduce((sum, t) => sum + spentInARS(t, dollarRate), 0),
+    [spentTx, dollarRate],
+  )
   const totalSpentPct = totalBudgeted > 0 ? (totalSpent / totalBudgeted) * 100 : 0
   const totalSpentStatus = totalSpentPct >= 100 ? 'over' : totalSpentPct >= 80 ? 'warn' : ''
 
   function spentForCategory(categoryId: string) {
-    return spentTx.filter((t) => t.category_id === categoryId).reduce((sum, t) => sum + t.amount, 0)
+    return spentTx.filter((t) => t.category_id === categoryId).reduce((sum, t) => sum + spentInARS(t, dollarRate), 0)
   }
 
   function openCreate() {
@@ -298,7 +334,7 @@ export default function Budgets() {
           supabase.from('budget_items').select('amount').eq('budget_period_id', p.id),
           supabase
             .from('transactions')
-            .select('amount')
+            .select('amount, currency')
             .eq('type', 'expense')
             .gte('occurred_at', dateInputToISOStart(p.period_start))
             .lt('occurred_at', dateInputToISOEndExclusive(p.period_end)),
@@ -306,7 +342,7 @@ export default function Budgets() {
         return {
           period: p,
           totalBudgeted: (periodItems ?? []).reduce((sum, it) => sum + it.amount, 0),
-          totalSpent: (tx ?? []).reduce((sum, t) => sum + t.amount, 0),
+          totalSpent: (tx ?? []).reduce((sum, t) => sum + spentInARS(t, dollarRate), 0),
         }
       }),
     )
