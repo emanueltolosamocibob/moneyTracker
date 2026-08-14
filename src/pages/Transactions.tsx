@@ -44,9 +44,9 @@ function centsToNumber(digits: string) {
   return Number(digits || '0') / 100
 }
 
-function formatAmountDigits(digits: string) {
+function formatAmountDigits(digits: string, currency: string) {
   if (!digits) return ''
-  return formatCurrency(centsToNumber(digits), 'ARS')
+  return formatCurrency(centsToNumber(digits), currency)
 }
 
 function numberToCentsDigits(amount: number) {
@@ -117,6 +117,7 @@ export default function Transactions() {
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod | ''>('')
   const [cardLast4, setCardLast4] = useState('')
   const [type, setType] = useState<TransactionType>('expense')
+  const [currency, setCurrency] = useState<'ARS' | 'USD'>('ARS')
   const [saving, setSaving] = useState(false)
   const [scanning, setScanning] = useState(false)
   // Cantidad de transacciones nuevas insertadas en el último scan (null =
@@ -208,14 +209,19 @@ export default function Transactions() {
       const cat = categories.find((c) => c.id === t.category_id)
       return cat?.name !== 'Interno'
     })
-    const income = relevant.filter((t) => t.type === 'income').reduce((sum, t) => sum + t.amount, 0)
+    const incomeARS = relevant
+      .filter((t) => t.type === 'income' && t.currency === 'ARS')
+      .reduce((sum, t) => sum + t.amount, 0)
+    const incomeUSD = relevant
+      .filter((t) => t.type === 'income' && t.currency === 'USD')
+      .reduce((sum, t) => sum + t.amount, 0)
     const expenseARS = relevant
       .filter((t) => t.type === 'expense' && t.currency === 'ARS')
       .reduce((sum, t) => sum + t.amount, 0)
     const expenseUSD = relevant
       .filter((t) => t.type === 'expense' && t.currency === 'USD')
       .reduce((sum, t) => sum + t.amount, 0)
-    return { income, expense: expenseARS, expenseUSD, net: income - expenseARS }
+    return { income: incomeARS, incomeUSD, expense: expenseARS, expenseUSD, net: incomeARS - expenseARS }
   }, [transactions, categories])
 
   const visibleTransactions = categoryFilterId
@@ -239,7 +245,7 @@ export default function Transactions() {
     const { error: insertError } = await supabase.from('transactions').insert({
       user_id: user.id,
       amount: centsToNumber(amountDigits),
-      currency: 'ARS',
+      currency,
       merchant: isIncome ? null : merchant || null,
       category_id: isIncome ? null : categoryId || null,
       income_source_id: isIncome ? incomeSourceId || null : null,
@@ -263,6 +269,7 @@ export default function Transactions() {
     setPaymentMethod('')
     setCardLast4('')
     setType('expense')
+    setCurrency('ARS')
     setFormOpen(false)
     load()
   }
@@ -461,14 +468,12 @@ export default function Transactions() {
         <div>
           <span>Ingresos</span>
           <strong className="tx-amount income">{formatCurrency(totals.income, 'ARS')}</strong>
+          {totals.incomeUSD > 0 && <span className="tx-summary-usd">+ {formatCurrency(totals.incomeUSD, 'USD')}</span>}
         </div>
         <div>
           <span>Egresos</span>
-          <strong className="tx-amount">
-            {formatCurrency(totals.expense, 'ARS')}
-            {totals.expenseUSD > 0 &&
-              ` + USD ${totals.expenseUSD.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
-          </strong>
+          <strong className="tx-amount">{formatCurrency(totals.expense, 'ARS')}</strong>
+          {totals.expenseUSD > 0 && <span className="tx-summary-usd">+ {formatCurrency(totals.expenseUSD, 'USD')}</span>}
         </div>
         <div className="tx-summary-net">
           <span>Neto</span>
@@ -501,6 +506,14 @@ export default function Transactions() {
             Ingreso
           </button>
         </div>
+        <div className="type-toggle" role="group" aria-label="Moneda">
+          <button type="button" className={currency === 'ARS' ? 'active' : ''} onClick={() => setCurrency('ARS')}>
+            ARS
+          </button>
+          <button type="button" className={currency === 'USD' ? 'active' : ''} onClick={() => setCurrency('USD')}>
+            USD
+          </button>
+        </div>
         <DateField value={occurredAt} onChange={setOccurredAt} />
         <div className="tx-field">
           <input
@@ -508,7 +521,7 @@ export default function Transactions() {
             inputMode="numeric"
             className="amount-input"
             placeholder="Monto"
-            value={formatAmountDigits(amountDigits)}
+            value={formatAmountDigits(amountDigits, currency)}
             onChange={(e) => {
               setAmountDigits(e.target.value.replace(/\D/g, '').slice(0, 12))
               if (amountError) setAmountError(null)
@@ -711,7 +724,7 @@ export default function Transactions() {
                 inputMode="numeric"
                 className="amount-input"
                 placeholder="Monto"
-                value={formatAmountDigits(editAmountDigits)}
+                value={formatAmountDigits(editAmountDigits, editingTx.currency)}
                 onChange={(e) => {
                   setEditAmountDigits(e.target.value.replace(/\D/g, '').slice(0, 12))
                   if (editAmountError) setEditAmountError(null)
