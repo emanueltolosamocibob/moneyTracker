@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react'
+import { Fragment, useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabaseClient'
 import { useAuth } from '../lib/AuthContext'
@@ -112,6 +112,8 @@ interface BudgetHistoryRow {
   period: BudgetPeriod
   totalBudgeted: number
   totalSpent: number
+  // Detalle por categoría del período, para la fila expandible.
+  byCategory: { categoryId: string; budgeted: number; spent: number }[]
 }
 
 function BudgetRing({ pct, icon }: { pct: number; icon: ReactNode }) {
@@ -170,6 +172,7 @@ export default function Budgets() {
   const [historyOpen, setHistoryOpen] = useState(false)
   const [historyLoading, setHistoryLoading] = useState(false)
   const [historyRows, setHistoryRows] = useState<BudgetHistoryRow[]>([])
+  const [historyExpanded, setHistoryExpanded] = useState<string | null>(null)
 
   async function load() {
     if (!user) return
@@ -324,6 +327,7 @@ export default function Budgets() {
 
   async function openHistory() {
     setHistoryOpen(true)
+    setHistoryExpanded(null)
     setHistoryLoading(true)
     const { data: periods } = await supabase.from('budget_periods').select('*').order('period_start', { ascending: false })
     const list = periods ?? []
@@ -331,18 +335,34 @@ export default function Budgets() {
     const rows = await Promise.all(
       list.map(async (p): Promise<BudgetHistoryRow> => {
         const [{ data: periodItems }, { data: tx }] = await Promise.all([
-          supabase.from('budget_items').select('amount').eq('budget_period_id', p.id),
+          supabase.from('budget_items').select('category_id, amount').eq('budget_period_id', p.id),
           supabase
             .from('transactions')
-            .select('amount, currency')
+            .select('category_id, amount, currency')
             .eq('type', 'expense')
             .gte('occurred_at', dateInputToISOStart(p.period_start))
             .lt('occurred_at', dateInputToISOEndExclusive(p.period_end)),
         ])
+        const itemRows = (periodItems ?? []) as { category_id: string; amount: number }[]
+        const txRows = (tx ?? []) as { category_id: string | null; amount: number; currency: string }[]
+        // Una fila por categoría con tope, más una agrupada ('') con lo gastado
+        // fuera de todo tope, para que el detalle sume igual que el total.
+        const byCategory = itemRows.map((it) => ({
+          categoryId: it.category_id,
+          budgeted: it.amount,
+          spent: txRows
+            .filter((t) => t.category_id === it.category_id)
+            .reduce((sum, t) => sum + spentInARS(t, dollarRate), 0),
+        }))
+        const outside = txRows
+          .filter((t) => !itemRows.some((it) => it.category_id === t.category_id))
+          .reduce((sum, t) => sum + spentInARS(t, dollarRate), 0)
+        if (outside > 0) byCategory.push({ categoryId: '', budgeted: 0, spent: outside })
         return {
           period: p,
-          totalBudgeted: (periodItems ?? []).reduce((sum, it) => sum + it.amount, 0),
-          totalSpent: (tx ?? []).reduce((sum, t) => sum + spentInARS(t, dollarRate), 0),
+          totalBudgeted: itemRows.reduce((sum, it) => sum + it.amount, 0),
+          totalSpent: txRows.reduce((sum, t) => sum + spentInARS(t, dollarRate), 0),
+          byCategory: byCategory.sort((a, b) => b.spent - a.spent),
         }
       }),
     )
@@ -652,19 +672,61 @@ export default function Budgets() {
                     <th>Tipo</th>
                     <th>Presupuestado</th>
                     <th>Gastado</th>
+                    <th>Usado</th>
+                    <th>Diferencia</th>
                     <th></th>
                   </tr>
                 </thead>
                 <tbody>
-                  {historyRows.map(({ period: p, totalBudgeted: budgeted, totalSpent: spent }) => (
-                    <tr key={p.id}>
-                      <td>{formatPeriodLabel(p.period_type, p.period_start, p.period_end)}</td>
-                      <td>{p.period_type === 'monthly' ? 'Mensual' : 'Personalizado'}</td>
-                      <td className="tx-amount">{formatCurrency(budgeted, 'ARS')}</td>
-                      <td className="tx-amount">{formatCurrency(spent, 'ARS')}</td>
-                      <td>{period?.id === p.id && <span className="new-badge" title="Activo">●</span>}</td>
-                    </tr>
-                  ))}
+                  {historyRows.map(({ period: p, totalBudgeted: budgeted, totalSpent: spent, byCategory }) => {
+                    const pct = budgeted > 0 ? (spent / budgeted) * 100 : 0
+                    const status = pct >= 100 ? 'over' : pct >= 80 ? 'warn' : ''
+                    const open = historyExpanded === p.id
+                    return (
+                      <Fragment key={p.id}>
+                        <tr className="dashboard-card-clickable" onClick={() => setHistoryExpanded(open ? null : p.id)}>
+                          <td>{formatPeriodLabel(p.period_type, p.period_start, p.period_end)}</td>
+                          <td>{p.period_type === 'monthly' ? 'Mensual' : 'Personalizado'}</td>
+                          <td className="tx-amount">{formatCurrency(budgeted, 'ARS')}</td>
+                          <td className="tx-amount">{formatCurrency(spent, 'ARS')}</td>
+                          <td className={`tx-amount budget-history-pct ${status}`}>
+                            {budgeted > 0 ? `${Math.round(pct)}%` : '—'}
+                          </td>
+                          <td className={`tx-amount budget-history-pct ${spent > budgeted ? 'over' : ''}`}>
+                            {formatCurrency(budgeted - spent, 'ARS')}
+                          </td>
+                          <td>{period?.id === p.id && <span className="new-badge" title="Activo">●</span>}</td>
+                        </tr>
+                        {open && (
+                          <tr className="budget-history-detail-row">
+                            <td colSpan={7}>
+                              {byCategory.length === 0 ? (
+                                <p className="empty-state">Este período no tuvo topes ni gastos.</p>
+                              ) : (
+                                <ul className="budget-history-detail">
+                                  {byCategory.map((row) => {
+                                    const catPct = row.budgeted > 0 ? (row.spent / row.budgeted) * 100 : 0
+                                    const catStatus =
+                                      row.budgeted === 0 ? '' : catPct >= 100 ? 'over' : catPct >= 80 ? 'warn' : ''
+                                    const cat = categories.find((c) => c.id === row.categoryId)
+                                    return (
+                                      <li key={row.categoryId || 'sin-tope'}>
+                                        <span>{row.categoryId ? cat?.name ?? '—' : 'Sin tope'}</span>
+                                        <span className={`tx-amount budget-history-pct ${catStatus}`}>
+                                          {formatCurrency(row.spent, 'ARS')}
+                                          {row.budgeted > 0 && ` de ${formatCurrency(row.budgeted, 'ARS')}`}
+                                        </span>
+                                      </li>
+                                    )
+                                  })}
+                                </ul>
+                              )}
+                            </td>
+                          </tr>
+                        )}
+                      </Fragment>
+                    )
+                  })}
                 </tbody>
               </table>
             </div>

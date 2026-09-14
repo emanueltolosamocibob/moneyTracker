@@ -3098,3 +3098,33 @@ input[type='number'] {
     grid-template-columns: repeat(4, 1fr);
   }
 }
+
+.budget-history-pct.warn {
+  color: var(--warning);
+}
+
+.budget-history-pct.over {
+  color: var(--danger);
+}
+
+/* Fila expandible del resumen de presupuestos anteriores. */
+.budget-history-detail-row > td {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.budget-history-detail {
+  list-style: none;
+  margin: 0;
+  padding: 0.25rem 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 0.15rem 1.5rem;
+}
+
+.budget-history-detail li {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.2rem 0;
+  font-size: 0.85rem;
+}

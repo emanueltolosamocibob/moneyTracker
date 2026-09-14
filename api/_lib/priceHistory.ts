@@ -66,9 +66,21 @@ async function fetchYahooChart(ticker: string, params: Record<string, string>): 
   }
 }
 
-async function fetchYahoo(ticker: string, fromMs: number, toMs: number): Promise<DailyClose[] | null> {
-  const bars = await fetchYahooBars(ticker, fromMs, toMs)
-  return bars ? bars.map(({ date, close }) => ({ date, close })) : null
+// Yahoo a veces contesta la serie diaria de un CEDEAR con una sola vela (la de
+// hoy) en vez de contestar 404 — VIST.BA es el caso testigo, y con una sola
+// vela no hay variación que calcular. Antes eso alcanzaba para dar por buena
+// la serie y no se probaba el candidato siguiente, así que esos papeles
+// aparecían sin ningún valor en la tabla de alertas. Se pide un mínimo de dos
+// ruedas para considerar usable una serie; si el .BA no llega, se cae al
+// ticker pelado (en USD, pero una variación porcentual se compara igual).
+const MIN_SERIES_BARS = 2
+
+async function firstUsableBars(candidates: string[], fromMs: number, toMs: number): Promise<DailyBar[] | null> {
+  for (const candidate of candidates) {
+    const bars = await fetchYahooBars(candidate, fromMs, toMs)
+    if (bars && bars.length >= MIN_SERIES_BARS) return bars
+  }
+  return null
 }
 
 async function fetchYahooBars(ticker: string, fromMs: number, toMs: number): Promise<DailyBar[] | null> {
@@ -105,7 +117,8 @@ async function fetchYahooBars(ticker: string, fromMs: number, toMs: number): Pro
 async function resolveSeries(symbol: string, fromMs: number, toMs: number): Promise<DailyClose[] | null> {
   const clean = symbol.trim().toUpperCase()
   if (!clean) return null
-  return (await fetchYahoo(`${clean}.BA`, fromMs, toMs)) ?? (await fetchYahoo(clean, fromMs, toMs))
+  const bars = await firstUsableBars([`${clean}.BA`, clean], fromMs, toMs)
+  return bars ? bars.map(({ date, close }) => ({ date, close })) : null
 }
 
 export interface SignalOutcome {
@@ -190,8 +203,8 @@ export async function getDayChangePct(symbol: string): Promise<DayChange | null>
   if (!clean) return null
   const fromMs = Date.now() - 10 * 86_400_000
   const toMs = Date.now()
-  const bars = (await fetchYahooBars(`${clean}.BA`, fromMs, toMs)) ?? (await fetchYahooBars(clean, fromMs, toMs))
-  if (!bars || bars.length < 2) return null
+  const bars = await firstUsableBars([`${clean}.BA`, clean], fromMs, toMs)
+  if (!bars) return null
   const last = bars[bars.length - 1]
   const prev = bars[bars.length - 2]
   if (!(prev.close > 0)) return null
@@ -286,9 +299,5 @@ export async function getIntradaySeries(
 // pierde la vela del propio día de entrada.
 export async function getDailyBars(symbol: string, since: Date): Promise<DailyBar[]> {
   const fromMs = since.getTime() - 86_400_000
-  for (const candidate of candidateSymbols(symbol)) {
-    const bars = await fetchYahooBars(candidate, fromMs, Date.now())
-    if (bars) return bars
-  }
-  return []
+  return (await firstUsableBars(candidateSymbols(symbol), fromMs, Date.now())) ?? []
 }

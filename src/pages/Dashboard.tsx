@@ -650,12 +650,12 @@ export default function Dashboard() {
               )}
               <div className="dashboard-tx-stat-row">
                 <span>Inversiones</span>
-                <strong className="dashboard-tx-stat-amount">{formatCurrency(allTimeGains.ars, 'ARS')}</strong>
+                <strong className="tx-amount income dashboard-tx-stat-amount">{formatCurrency(allTimeGains.ars, 'ARS')}</strong>
               </div>
               {allTimeGains.usd !== 0 && (
                 <div className="dashboard-tx-stat-row">
                   <span>Inversiones (USD)</span>
-                  <strong className="dashboard-tx-stat-amount">{formatCurrency(allTimeGains.usd, 'USD')}</strong>
+                  <strong className="tx-amount income dashboard-tx-stat-amount">{formatCurrency(allTimeGains.usd, 'USD')}</strong>
                 </div>
               )}
             </div>
