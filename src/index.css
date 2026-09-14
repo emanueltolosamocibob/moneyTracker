@@ -3112,19 +3112,30 @@ input[type='number'] {
   background: rgba(255, 255, 255, 0.04);
 }
 
+/* Una categoría por línea: la grilla de varias columnas se pisaba con el
+   nowrap de las celdas de .tx-table. */
 .budget-history-detail {
   list-style: none;
   margin: 0;
   padding: 0.25rem 0;
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
-  gap: 0.15rem 1.5rem;
+  max-width: 32rem;
 }
 
 .budget-history-detail li {
   display: flex;
   justify-content: space-between;
-  gap: 1rem;
-  padding: 0.2rem 0;
+  align-items: baseline;
+  gap: 1.5rem;
+  padding: 0.25rem 0;
   font-size: 0.85rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.budget-history-detail li:last-child {
+  border-bottom: none;
+}
+
+.budget-history-detail-pct {
+  margin-left: 0.4rem;
+  opacity: 0.7;
 }
