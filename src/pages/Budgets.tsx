@@ -715,6 +715,9 @@ export default function Budgets() {
                                         <span className={`tx-amount budget-history-pct ${catStatus}`}>
                                           {formatCurrency(row.spent, 'ARS')}
                                           {row.budgeted > 0 && ` de ${formatCurrency(row.budgeted, 'ARS')}`}
+                                          {row.budgeted > 0 && (
+                                            <span className="budget-history-detail-pct">({Math.round(catPct)}%)</span>
+                                          )}
                                         </span>
                                       </li>
                                     )
