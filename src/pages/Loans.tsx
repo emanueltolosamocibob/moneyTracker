@@ -714,6 +714,14 @@ export default function Loans() {
                     Interés:{' '}
                     <strong>{formatLoanAmount(loan.amount_to_repay - loan.amount_requested, loan.currency)}</strong>
                   </span>
+                  {loan.installments_count > 0 && (
+                    <span>
+                      Cuota promedio:{' '}
+                      <strong>
+                        {formatLoanAmount(loan.amount_to_repay / loan.installments_count, loan.currency)}
+                      </strong>
+                    </span>
+                  )}
                 </div>
                 <strong className="loan-card-paid">
                   {formatLoanAmount(paidAmount, loan.currency)} / {formatLoanAmount(loan.amount_to_repay, loan.currency)}
