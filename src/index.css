@@ -1319,7 +1319,7 @@ input[type='number'] {
 }
 
 .modal-panel-wide {
-  max-width: 720px;
+  max-width: 1040px;
 }
 
 /* Para diálogos largos (el análisis de un símbolo son seis bloques): el panel

@@ -266,10 +266,14 @@ export default function Budgets() {
   }, [user])
 
   const totalBudgeted = useMemo(() => items.reduce((sum, it) => sum + it.amount, 0), [items])
-  const totalSpent = useMemo(
-    () => spentTx.reduce((sum, t) => sum + spentInARS(t, dollarRate), 0),
-    [spentTx, dollarRate],
-  )
+  const totalSpent = useMemo(() => {
+    // Solo lo gastado en categorías con tope > 0: el total tiene que ser comparable
+    // contra totalBudgeted, que sale de esos mismos topes.
+    const budgeted = new Set(items.filter((it) => it.amount > 0).map((it) => it.category_id))
+    return spentTx
+      .filter((t) => t.category_id && budgeted.has(t.category_id))
+      .reduce((sum, t) => sum + spentInARS(t, dollarRate), 0)
+  }, [spentTx, items, dollarRate])
   const totalSpentPct = totalBudgeted > 0 ? (totalSpent / totalBudgeted) * 100 : 0
   const totalSpentStatus = totalSpentPct >= 100 ? 'over' : totalSpentPct >= 80 ? 'warn' : ''
 
